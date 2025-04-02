@@ -3,7 +3,8 @@
     date: 18.03.2025
     author: Emir
     brief: Modbus Code for Modbus TCP
-    description: This module will handle Modbus TCP Packages and Modbus Communication
+    description: This module will handle Modbus TCP Packages and Modbus 
+    Communication
 */
 
 #include <stdint.h>
@@ -28,8 +29,9 @@ static void print_sent_package(uint8_t *package, uint8_t package_size);
 
 /*****************************************************************************/
 
+/* Maximum Package Size of Modbus */
 #define MODBUS_PACKAGE_MAX_SIZE 260
-
+/* Corresponding bit means error on modbus tcp */
 #define MODBUS_ERROR_BIT_VALUE 0x80
 
 /* Used to fill read request package at beginning*/
