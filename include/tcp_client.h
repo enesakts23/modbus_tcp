@@ -48,6 +48,17 @@ void set_socket_nonblocking(int sockfd);
 
 /*****************************************************************************/
 /**
+ * @brief Connects to the server which is given with res
+ * @details Tries to connect until 500ms.
+ * @param[in] sockfd [int] socket file descriptor of socket which is going to
+ * connect to server.
+ * @param[in] res [struct addrinfo*] struct that keeps settings of server.
+ * @return [int] returns 0 if connection is succesfull, otherwise returns -1
+ */
+int connect_to_server(int sockfd, struct addrinfo* res);
+
+/*****************************************************************************/
+/**
  * @brief Checks if connection is still stable or not
  * @details Checks with recv function of berkeley sockets if recv returns with
  * 0 it means connection is lost. it doesn't pop data with recv function. So
@@ -57,17 +68,6 @@ void set_socket_nonblocking(int sockfd);
  * @return [int] if connection is lost it returns -1, Otherwise it returns 0
  */
 int check_connection(int sockfd);
-
-/*****************************************************************************/
-/**
- * @brief Connects to the server which is given with res
- * @details Tries to connect until 500ms.
- * @param[in] sockfd [int] socket file descriptor of socket which is going to
- * connect to server.
- * @param[in] res [struct addrinfo*] struct that keeps settings of server.
- * @return [int] returns 0 if connection is succesfull, otherwise returns -1
- */
-int connect_to_server(int sockfd, struct addrinfo* res);
 
 /*****************************************************************************/
 /**

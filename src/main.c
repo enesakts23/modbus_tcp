@@ -24,7 +24,7 @@ void WriteToPCServerWriteSingleReg(void);
 void WriteToPCServerWriteMultiCoils(void);
 void WriteToPCServerWriteMultiRegisters(void);
 void print_received_data(uint8_t data_length);
-void return_errors(modbus_respond_return_val_t ret_val);
+void return_errors(modbus_response_return_val_t ret_val);
 
 uint8_t pdu_buffer[MODBUS_RECEIVE_MAX_DATA_SIZE];
 uint8_t pdu_write_buffer[MODBUS_WRITE_MULT_REQ_MAX_DATA_SIZE];
@@ -44,7 +44,7 @@ void ReadFromPCServer(void)
 {  
     uint8_t data_length;
     uint8_t counter = 0;
-    modbus_respond_return_val_t ret_val;
+    modbus_response_return_val_t ret_val;
 
     if(connect_to_modbus_server("localhost") == -1)
     {
@@ -164,7 +164,7 @@ void WriteToPCServeWriteSingleCoil(void)
 {
     uint8_t data_length;
     uint8_t counter = 0;
-    modbus_respond_return_val_t ret_val;
+    modbus_response_return_val_t ret_val;
     
     if(connect_to_modbus_server("localhost") == -1)
     {
@@ -230,7 +230,7 @@ void WriteToPCServerWriteSingleReg(void)
 {
     uint8_t data_length;
     uint8_t counter = 0;
-    modbus_respond_return_val_t ret_val;
+    modbus_response_return_val_t ret_val;
     
     if(connect_to_modbus_server("localhost") == -1)
     {
@@ -294,7 +294,7 @@ void WriteToPCServerWriteMultiCoils(void)
 {
     uint8_t data_length;
     uint8_t counter = 0;
-    modbus_respond_return_val_t ret_val;
+    modbus_response_return_val_t ret_val;
     
     if(connect_to_modbus_server("localhost") == -1)
     {
@@ -310,7 +310,7 @@ void WriteToPCServerWriteMultiCoils(void)
     pdu_write_buffer[0] = 0x8C;
     pdu_write_buffer[1] = 0x02;
 
-    send_write_mult_coils_req(FUNC_WRITE_MULTIPLE_COILS, 0x00, pdu_write_buffer, 10);
+    send_write_mult_req(FUNC_WRITE_MULTIPLE_COILS, 0x00, pdu_write_buffer, 10);
 
     if (check_modbus_server_connection() == -1)
     {
@@ -361,7 +361,7 @@ void WriteToPCServerWriteMultiRegisters(void)
 {
     uint8_t data_length;
     uint8_t counter = 0;
-    modbus_respond_return_val_t ret_val;
+    modbus_response_return_val_t ret_val;
     
     if(connect_to_modbus_server("localhost") == -1)
     {
@@ -382,7 +382,7 @@ void WriteToPCServerWriteMultiRegisters(void)
     pdu_write_buffer[4] = 0x00;
     pdu_write_buffer[5] = 0x2D;
 
-    send_write_mult_coils_req(FUNC_WRITE_MULTIPLE_REGISTERS, 0x00, pdu_write_buffer, 3);
+    send_write_mult_req(FUNC_WRITE_MULTIPLE_REGISTERS, 0x00, pdu_write_buffer, 3);
 
     if (check_modbus_server_connection() == -1)
     {
@@ -417,6 +417,13 @@ void WriteToPCServerWriteMultiRegisters(void)
         if(counter == 10)
         {
             break;
+        }
+
+        /* Add this to every read. */
+        if (check_modbus_server_connection() == -1)
+        {
+            printf("Connection Closed\n");
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -482,7 +489,7 @@ void print_received_data(uint8_t data_length)
     printf("\n");
 }
 
-void return_errors(modbus_respond_return_val_t ret_val)
+void return_errors(modbus_response_return_val_t ret_val)
 {
     if(ret_val == MODBUS_RESPONSE_ILLEGAL_ADDRESS)
     {

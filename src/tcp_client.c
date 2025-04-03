@@ -68,19 +68,6 @@ void set_socket_nonblocking(int sockfd) {
 }
 
 /*****************************************************************************/
-int check_connection(int sockfd)
-{
-    char buffer[1];
-    // checks if connection is lost or not
-    if(recv(sockfd, buffer, 1, MSG_PEEK) == 0)
-    {
-        return -1;
-    } 
-    
-    return 0;
-}
-
-/*****************************************************************************/
 int connect_to_server(int sockfd, struct addrinfo* res)
 {   
     struct pollfd pfd;
@@ -125,6 +112,19 @@ int connect_to_server(int sockfd, struct addrinfo* res)
     printf("Connection is successfull\n");
     
     return 0;  // Bağlantı başarılı
+}
+
+/*****************************************************************************/
+int check_connection(int sockfd)
+{
+    char buffer[1];
+    // checks if connection is lost or not
+    if(recv(sockfd, buffer, 1, MSG_PEEK) == 0)
+    {
+        return -1;
+    } 
+    
+    return 0;
 }
 
 /*****************************************************************************/

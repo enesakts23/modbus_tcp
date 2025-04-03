@@ -12,22 +12,102 @@
 #include <string.h>
 #include "modbus.h"
 
-/*****************************************************************************/
-static void parse_read_data(uint8_t *data);
+typedef struct __attribute__((packed)) st_read_req_package_t
+{
+    uint8_t transaction_identifier_h;
+    uint8_t transaction_identifier_l;
+    uint8_t protocol_identifier_h;
+    uint8_t protocol_identifier_l;
+    uint8_t message_length_h;
+    uint8_t message_length_l;
+    uint8_t device_address;
+    uint8_t function_code;
+    uint8_t address_high;
+    uint8_t address_low;
+    uint8_t number_of_regs_high;
+    uint8_t number_of_regs_low;
+} read_req_package_t;
 
-/*****************************************************************************/
-static void parse_write_single_response(uint8_t *data);
+typedef struct __attribute__((packed)) st_write_single_req_package_t
+{
+    uint8_t transaction_identifier_h;
+    uint8_t transaction_identifier_l;
+    uint8_t protocol_identifier_h;
+    uint8_t protocol_identifier_l;
+    uint8_t message_length_h;
+    uint8_t message_length_l;
+    uint8_t device_address;
+    uint8_t function_code;
+    uint8_t address_high;
+    uint8_t address_low;
+    uint8_t byte_meaning_high;
+    uint8_t byte_meaning_low;
+} write_single_req_package_t;
 
-/*****************************************************************************/
-static void parse_write_mult_response(uint8_t *data);
+typedef struct __attribute__((packed)) st_write_mult_req_package_t
+{
+    uint8_t transaction_identifier_h;
+    uint8_t transaction_identifier_l;
+    uint8_t protocol_identifier_h;
+    uint8_t protocol_identifier_l;
+    uint8_t message_length_h;
+    uint8_t message_length_l;
+    uint8_t device_address;
+    uint8_t function_code;
+    uint8_t address_high;
+    uint8_t address_low;
+    uint8_t number_of_regs_high;
+    uint8_t number_of_regs_low;
+    uint8_t number_of_bytes_more;
+    // uint8_t* data_buffer;           // 247 Byte
+} write_mult_req_package_t;
 
-/*****************************************************************************/
-static modbus_error_t parse_error(uint8_t *data);
+typedef struct __attribute__((packed)) st_read_resp_package_t
+{
+    uint8_t transaction_identifier_h;
+    uint8_t transaction_identifier_l;
+    uint8_t protocol_identifier_h;
+    uint8_t protocol_identifier_l;
+    uint8_t message_length_h;
+    uint8_t message_length_l;
+    uint8_t device_address;
+    uint8_t function_code;
+    uint8_t num_of_bytes_more;
+    uint8_t* data_buffer;           // 251 Byte
+} read_resp_package_t;
 
-/*****************************************************************************/
-static void print_sent_package(uint8_t *package, uint8_t package_size);
+// This one is same with the req package
+typedef struct __attribute__((packed)) st_write_single_resp_package_t
+{
+    uint8_t transaction_identifier_h;
+    uint8_t transaction_identifier_l;
+    uint8_t protocol_identifier_h;
+    uint8_t protocol_identifier_l;
+    uint8_t message_length_h;
+    uint8_t message_length_l;
+    uint8_t device_address;
+    uint8_t function_code;
+    uint8_t address_high;
+    uint8_t address_low;
+    uint8_t byte_meaning_high;
+    uint8_t byte_meaning_low;
+} write_single_resp_package_t;
 
-/*****************************************************************************/
+typedef struct __attribute__((packed)) st_write_mult_resp_package_t
+{
+    uint8_t transaction_identifier_h;
+    uint8_t transaction_identifier_l;
+    uint8_t protocol_identifier_h;
+    uint8_t protocol_identifier_l;
+    uint8_t message_length_h;
+    uint8_t message_length_l;
+    uint8_t device_address;
+    uint8_t function_code;
+    uint8_t address_high;
+    uint8_t address_low;
+    uint8_t number_of_recorded_reg_high;
+    uint8_t number_of_recorded_reg_low;
+} write_mult_resp_package_t;
 
 /* Maximum Package Size of Modbus */
 #define MODBUS_PACKAGE_MAX_SIZE 260
@@ -81,15 +161,78 @@ static void print_sent_package(uint8_t *package, uint8_t package_size);
     /* NULL */                                                          \
     }
 
-read_resp_package_t read_response_package;
-write_single_resp_package_t write_single_response_package;
-write_mult_resp_package_t write_mult_response_package;
+/*****************************************************************************/
+/**
+ * @brief Parses given data into a read_resp_package_t structure which is used
+ * in this module to parse received data from modbus.
+ * @details it parses data to a structure named read_response_package which is 
+ * type of read_resp_package_t. Then that structure is used to return received
+ * values.
+ * @param[in] data [uint8_t *] data array which is holding the received data
+ * from tcp.
+ * @return [void]
+ */
+static void parse_read_data(uint8_t *data);
 
-uint8_t modbus_buffer[MODBUS_PACKAGE_MAX_SIZE];
+/*****************************************************************************/
+/**
+ * @brief Parses response of write single functions like write sinlge coil and
+ * write single register into a write_single_resp_package_t structure.
+ * @details it parses data to a structure named write_single_response_package
+ * which is type of write_single_resp_package_t. Then that structure is used to
+ * return received values.
+ * @param[in] data [uint8_t *] data array which is holding the received data
+ * from tcp.
+ * @return [void]
+ */
+static void parse_write_single_response(uint8_t *data);
 
-struct addrinfo *res;
-int sfd;
+/*****************************************************************************/
+/**
+ * @brief Parses given data into a write_mult_resp_package_t structure which is
+ * used in this module to parse received data from modbus.
+ * @details it parses data to a structure named write_mult_response_package 
+ * which is type of write_mult_resp_package_t. Then that structure is used to
+ * return received values.
+ * @param[in] data [uint8_t *] data array which is holding the received data
+ * from tcp.
+ * @return [void]
+ */
+static void parse_write_mult_response(uint8_t *data);
 
+/*****************************************************************************/
+/**
+ * @brief it parses and returns error type as modbus_error_t from given data
+ * @details error check of data must be done before using this function. This
+ * function doesn't check if any error occured or not. 
+ * @param[in] data [uint8_t *] data array which is holding the received data
+ * from modbus tcp and has the error type in it.
+ * @return [modbus_error_t] it returns error type but doesn't provide every type
+ * of modbus error for now. it only indicates if error is function code wrong or
+ * invalid address. Otherwise it only returns it as unknown error. And if the
+ * error check is made carefully it can't return MODBUS_ERROR_NONE.
+ */
+static modbus_error_t parse_error(uint8_t *data);
+
+/*****************************************************************************/
+/* This function will be deleted later. Used for debugging purpose. */
+static void print_sent_package(uint8_t *package, uint8_t package_size);
+
+/*****************************************************************************/
+
+/* Package Variables */
+static read_resp_package_t read_response_package;
+static write_single_resp_package_t write_single_response_package;
+static write_mult_resp_package_t write_mult_response_package;
+
+/* Buffer to use with TCP/IP */
+static uint8_t modbus_buffer[MODBUS_PACKAGE_MAX_SIZE];
+
+/* TCP/IP communication variables*/
+static struct addrinfo *res;
+static int sfd;
+
+/* Function Definitions */
 /*****************************************************************************/
 int connect_to_modbus_server(const char *connection_address)
 {
@@ -176,7 +319,6 @@ modbus_req_return_val_t send_read_req(modbus_functions_t modbus_func,
 }
 
 /*****************************************************************************/
-/* Writes to single coil */
 modbus_req_return_val_t send_write_single_coil_req(uint16_t address,
                                                    write_single_req_value_t value)
 {
@@ -233,10 +375,10 @@ modbus_req_return_val_t send_write_single_reg_req(uint16_t address,
 }
 
 /*****************************************************************************/
-modbus_req_return_val_t send_write_mult_coils_req(modbus_functions_t modbus_func,
-                                                  uint16_t start_address,
-                                                  uint8_t *data,
-                                                  uint16_t reg_count)
+modbus_req_return_val_t send_write_mult_req(modbus_functions_t modbus_func,
+                                            uint16_t start_address,
+                                            uint8_t *data,
+                                            uint16_t reg_count)
 {
     write_mult_req_package_t write_mult_req_pack = WRITE_MULT_REQ_PACKAGE_DEFAULT;
 
@@ -286,8 +428,8 @@ modbus_req_return_val_t send_write_mult_coils_req(modbus_functions_t modbus_func
 }
 
 /*****************************************************************************/
-modbus_respond_return_val_t receive_read_response(uint8_t *data_received,
-                                                  uint8_t *data_length)
+modbus_response_return_val_t receive_read_response(uint8_t *data_received,
+                                                   uint8_t *data_length)
 {
     int poll_res;
     ssize_t recv_size;
@@ -338,8 +480,8 @@ modbus_respond_return_val_t receive_read_response(uint8_t *data_received,
 }
 
 /*****************************************************************************/
-modbus_respond_return_val_t receive_write_single_coil_response(uint16_t *address,
-                                                               write_single_req_value_t *value)
+modbus_response_return_val_t receive_write_single_coil_response(uint16_t *address,
+                                                                write_single_req_value_t *value)
 {
     int poll_res;
     ssize_t recv_size;
@@ -369,9 +511,9 @@ modbus_respond_return_val_t receive_write_single_coil_response(uint16_t *address
             }
 
             parse_write_single_response(modbus_buffer);
-            /* We are returning value of returned package, so we can check if it is writtem
-                right or not in application.
-                hight is 0xFF and low is 0x00 for COIL_ON 0x00 0x00 for COIL OFF */
+            /* We are returning value of returned package, so we can check if it is written
+               right or not in application.
+               hight is 0xFF and low is 0x00 for COIL_ON 0x00 0x00 for COIL OFF */
             if (write_single_response_package.byte_meaning_low == 0x00)
             {
                 if (write_single_response_package.byte_meaning_high == 0x00)
@@ -415,8 +557,8 @@ modbus_respond_return_val_t receive_write_single_coil_response(uint16_t *address
 }
 
 /*****************************************************************************/
-modbus_respond_return_val_t receive_write_single_reg_response(uint16_t *address,
-                                                              uint16_t *value)
+modbus_response_return_val_t receive_write_single_reg_response(uint16_t *address,
+                                                               uint16_t *value)
 {
     int poll_res;
     ssize_t recv_size;
@@ -471,8 +613,8 @@ modbus_respond_return_val_t receive_write_single_reg_response(uint16_t *address,
 }
 
 /*****************************************************************************/
-modbus_respond_return_val_t receive_write_mult_response(uint16_t *address,
-                                                        uint16_t *num_of_recorded_regs)
+modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
+                                                         uint16_t *num_of_recorded_regs)
 {
     int poll_res;
     ssize_t recv_size;
@@ -526,27 +668,17 @@ modbus_respond_return_val_t receive_write_mult_response(uint16_t *address,
 }
 
 /*****************************************************************************/
-
 static void parse_read_data(uint8_t *data)
 {
     // 8 is the address of "number of bytes" so we copy 9 bytes.
     memcpy(&read_response_package, data, 9);
-
-    printf("Byte Count = %d\n", read_response_package.num_of_bytes_more);
-
     memcpy(read_response_package.data_buffer, (data + 9), read_response_package.num_of_bytes_more);
-
-    print_sent_package(data, 9 + read_response_package.num_of_bytes_more);
 }
 
 /*****************************************************************************/
 static void parse_write_single_response(uint8_t *data)
 {
     memcpy(&write_single_response_package, data, sizeof(write_single_resp_package_t));
-    for (int i = 0; i < (int)sizeof(write_single_resp_package_t); i++)
-    {
-        printf("Data[%d] = 0x%X\n", i, data[i]);
-    }
 }
 
 /*****************************************************************************/
@@ -560,7 +692,6 @@ static modbus_error_t parse_error(uint8_t *data)
 {
     uint8_t error_val = data[8];
 
-    // printf("Data Error is %u\n", data[8]);
     if (error_val >= (uint8_t)MODBUS_ERROR_UNKNOWN_ERROR)
     {
         error_val = (uint8_t)MODBUS_ERROR_UNKNOWN_ERROR;
