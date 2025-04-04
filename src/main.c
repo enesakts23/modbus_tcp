@@ -9,13 +9,11 @@
 */
 
 #define _GNU_SOURCE
-#define MAX_MESSAGE_SIZE 500
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "modbus.h"
-// #include "tcp_client.h"
 
 void ReadEMSData(void);
 void ReadFromPCServer(void);
@@ -31,11 +29,11 @@ uint8_t pdu_write_buffer[MODBUS_WRITE_MULT_REQ_MAX_DATA_SIZE];
 
 int main(void)
 {
-    // ReadFromPCServer();
+    ReadFromPCServer();
     // WriteToPCServeWriteSingleCoil();
     // WriteToPCServerWriteSingleReg();
     // WriteToPCServerWriteMultiCoils();
-    WriteToPCServerWriteMultiRegisters();
+    // WriteToPCServerWriteMultiRegisters();
 
     return 0;
 }
@@ -57,7 +55,7 @@ void ReadFromPCServer(void)
         exit(EXIT_FAILURE);
     }
 
-    if(send_read_req(FUNC_READ_COILS, 0, 8) != MODBUS_REQ_OK)
+    if(send_read_req(FUNC_READ_COILS, 0x00, 8) != MODBUS_REQ_OK)
     {
         printf("Communication Error, Exitting...\n");
         exit(EXIT_FAILURE);
@@ -187,7 +185,12 @@ void WriteToPCServeWriteSingleCoil(void)
 
     uint16_t address_received;
     write_single_req_value_t value;
-    receive_write_single_coil_response(&address_received, &value);
+
+    if(receive_write_single_coil_response(&address_received, &value) != MODBUS_RESPONSE_OK)
+    {
+        printf("Modbus Error\n");
+        exit(EXIT_FAILURE);
+    }
 
     if((value != COIL_ON) || (address_received != 0x02))
     {
@@ -243,7 +246,7 @@ void WriteToPCServerWriteSingleReg(void)
         exit(EXIT_FAILURE);
     }
 
-    send_write_single_reg_req(0x02, 0xABCD);
+    send_write_single_reg_req(0xFA, 0xABCD);
 
     if (check_modbus_server_connection() == -1)
     {
@@ -254,7 +257,11 @@ void WriteToPCServerWriteSingleReg(void)
     uint16_t address_received;
     uint16_t value;
 
-    receive_write_single_reg_response(&address_received, &value);
+    if(receive_write_single_reg_response(&address_received, &value) != MODBUS_RESPONSE_OK)
+    {
+        printf("Modbus Error\n");
+        exit(EXIT_FAILURE);
+    }
 
     printf("Address = 0x%X\n", address_received);
     printf("Value = 0x%X\n", value);
@@ -393,7 +400,11 @@ void WriteToPCServerWriteMultiRegisters(void)
     uint16_t address_received;
     uint16_t nums_of_recorded_registers;
 
-    receive_write_mult_response(&address_received, &nums_of_recorded_registers);
+    if(receive_write_mult_response(&address_received, &nums_of_recorded_registers) != MODBUS_RESPONSE_OK)
+    {
+        printf("Modbus Error\n");
+        exit(EXIT_FAILURE);
+    }
 
     printf("Address = 0x%X\n", address_received);
     printf("Value = 0x%X\n", nums_of_recorded_registers);
@@ -442,7 +453,7 @@ void ReadEMSData(void)
     uint8_t counter = 0;
     int ret_val;
     
-    if(connect_to_modbus_server("198.120.0.250") == -1)      // EMS Side
+    if(connect_to_modbus_server("198.120.0.250") == -1)      // EMS Side .100 will be used for bms side.
     {
         exit(EXIT_FAILURE);
     }
@@ -477,6 +488,7 @@ void ReadEMSData(void)
         return_errors(ret_val);
     }
     
+    close_connection();
 }
 
 void print_received_data(uint8_t data_length)
@@ -497,7 +509,7 @@ void return_errors(modbus_response_return_val_t ret_val)
     }
     else if(ret_val == MODBUS_RESPONSE_ILLEGAL_FUNCTION)
     {
-        printf("Illegal Fucntion 0x01 Error Returned From Server\n");
+        printf("Illegal Function 0x01 Error Returned From Server\n");
     }
     else if(ret_val == MODBUS_RESPONSE_GENERAL_ERROR)
     {

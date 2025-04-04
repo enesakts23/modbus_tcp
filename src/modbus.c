@@ -116,33 +116,35 @@ typedef struct __attribute__((packed)) st_write_mult_resp_package_t
 
 /* Used to fill read request package at beginning*/
 /* Transaction ID Must be changed with every request. Will be applied later. */
-#define READ_REQ_PACKAGE_DEFAULT (read_req_package_t){ \
-    0x01,                                              \
-    0x02,                                              \
-    0x00,                                              \
-    0x00,                                              \
-    0x00,                                              \
-    0x06,                                              \
-    0x01,                                              \
-    0,                                                 \
-    0,                                                 \
-    0,                                                 \
-    0,                                                 \
-    0}
+#define READ_REQ_PACKAGE_DEFAULT (read_req_package_t){                  \
+    0x01,                                                               \
+    0x02,                                                               \
+    0x00,                                                               \
+    0x00,                                                               \
+    0x00,                                                               \
+    0x06,                                                               \
+    0x01,                                                               \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+0                                                                       \
+}
 
-#define WRITE_SINGLE_REQ_PACKAGE_DEFAULT (write_single_req_package_t){ \
-    0x01,                                                              \
-    0x02,                                                              \
-    0x00,                                                              \
-    0x00,                                                              \
-    0x00,                                                              \
-    0x06,                                                              \
-    0x01,                                                              \
-    0,                                                                 \
-    0,                                                                 \
-    0,                                                                 \
-    0,                                                                 \
-    0}
+#define WRITE_SINGLE_REQ_PACKAGE_DEFAULT (write_single_req_package_t){  \
+    0x01,                                                               \
+    0x02,                                                               \
+    0x00,                                                               \
+    0x00,                                                               \
+    0x00,                                                               \
+    0x06,                                                               \
+    0x01,                                                               \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+    0                                                                   \
+}
 
 #define WRITE_MULT_REQ_PACKAGE_DEFAULT  (write_mult_req_package_t) {    \
     0x01,                                                               \
@@ -161,6 +163,19 @@ typedef struct __attribute__((packed)) st_write_mult_resp_package_t
     /* NULL */                                                          \
     }
 
+/*****************************************************************************/
+
+/**
+ * @brief Checks if any error returned at response from modbus server
+ * @details Can only detect illegal address or illegal function. All other
+ * errors are not identified and returned as general error.
+ * @param[in] modbus_buffer [uint8_t *] data array which is holding the received
+ * data from tcp.
+ * @return [modbus_response_return_val_t] returns MODBUS_RESPONSE_OK in no 
+ * error situation. Can return illegal address or illegal function. Other
+ * errors will be returned as MODBUS_RESPONSE_GENERAL_ERROR.
+ */
+static modbus_response_return_val_t check_error(uint8_t * modbus_buffer);
 /*****************************************************************************/
 /**
  * @brief Parses given data into a read_resp_package_t structure which is used
@@ -263,8 +278,7 @@ int connect_to_modbus_server(const char *connection_address)
     if (connect_to_server(sfd, res) != 0)
     {
         printf("Can't connect to server\n");
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return -1;
     }
 
@@ -276,8 +290,7 @@ int check_modbus_server_connection(void)
 {
     if (check_connection(sfd) == -1)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return -1;
     }
 
@@ -310,8 +323,7 @@ modbus_req_return_val_t send_read_req(modbus_functions_t modbus_func,
 
     if (send_data_to_server(sfd, (uint8_t *)&read_req_pack, sizeof(read_req_package_t)) == -1)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -342,8 +354,7 @@ modbus_req_return_val_t send_write_single_coil_req(uint16_t address,
 
     if (send_data_to_server(sfd, (uint8_t *)&write_req_pack, sizeof(write_single_req_package_t)) == -1)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -366,8 +377,7 @@ modbus_req_return_val_t send_write_single_reg_req(uint16_t address,
 
     if (send_data_to_server(sfd, (uint8_t *)&write_req_pack, sizeof(read_req_package_t)) == -1)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -419,8 +429,7 @@ modbus_req_return_val_t send_write_mult_req(modbus_functions_t modbus_func,
     
     if (send_data_to_server(sfd, (uint8_t *)&modbus_buffer, (sizeof(write_mult_req_package_t) + (size_t)write_mult_req_pack.number_of_bytes_more)) == -1)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -433,28 +442,16 @@ modbus_response_return_val_t receive_read_response(uint8_t *data_received,
 {
     int poll_res;
     ssize_t recv_size;
-    modbus_error_t error;
+    modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
     if ((poll_res = check_input_buffer(sfd)) > 0)
     {
         if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == 0)
         {
-            if ((modbus_buffer[7] & MODBUS_ERROR_BIT_VALUE))
+            if((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
             {
-                error = parse_error(modbus_buffer);
-                if (error == MODBUS_ERROR_INVALID_ADDRESS)
-                {
-                    return MODBUS_RESPONSE_ILLEGAL_ADDRESS; // Invalid Address Error
-                }
-                else if (error == MODBUS_ERROR_FUNCTION_CODE_WRONG)
-                {
-                    return MODBUS_RESPONSE_ILLEGAL_FUNCTION;    // Illegal Function Code Sent
-                }
-                else
-                {
-                    return MODBUS_RESPONSE_GENERAL_ERROR; // We don't identify other errorss
-                }
+                return modbus_response_error;
             }
 
             read_response_package.data_buffer = data_received;
@@ -471,8 +468,7 @@ modbus_response_return_val_t receive_read_response(uint8_t *data_received,
     }
     else
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
 
@@ -485,35 +481,22 @@ modbus_response_return_val_t receive_write_single_coil_response(uint16_t *addres
 {
     int poll_res;
     ssize_t recv_size;
-    modbus_error_t error;
+    modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
     if ((poll_res = check_input_buffer(sfd)) > 0)
     {
         if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == 0)
         {
-            if ((modbus_buffer[7] & MODBUS_ERROR_BIT_VALUE))
+            if((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
             {
-                error = parse_error(modbus_buffer);
-                if (error == MODBUS_ERROR_INVALID_ADDRESS)
-                {
-                    return MODBUS_RESPONSE_ILLEGAL_ADDRESS; // Invalid Address Error
-                }
-                else if (error == MODBUS_ERROR_FUNCTION_CODE_WRONG)
-                {
-                    printf("Wrong Function Code\n");
-                    return MODBUS_RESPONSE_ILLEGAL_FUNCTION;
-                }
-                else
-                {
-                    return MODBUS_RESPONSE_GENERAL_ERROR; // We don't identify other errorss
-                }
+                return modbus_response_error;
             }
 
             parse_write_single_response(modbus_buffer);
-            /* We are returning value of returned package, so we can check if it is written
-               right or not in application.
-               hight is 0xFF and low is 0x00 for COIL_ON 0x00 0x00 for COIL OFF */
+            /* We are returning value of returned package, so we can check if
+               it is written right or not in application.
+               high is 0xFF and low is 0x00 for COIL_ON 0x00 0x00 for COIL OFF */
             if (write_single_response_package.byte_meaning_low == 0x00)
             {
                 if (write_single_response_package.byte_meaning_high == 0x00)
@@ -548,8 +531,7 @@ modbus_response_return_val_t receive_write_single_coil_response(uint16_t *addres
     }
     else // means poll_res < 0 and that means communication error.
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
 
@@ -562,13 +544,12 @@ modbus_response_return_val_t receive_write_single_reg_response(uint16_t *address
 {
     int poll_res;
     ssize_t recv_size;
-    modbus_error_t error;
+    modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
     if ((poll_res = check_input_buffer(sfd)) < 0)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
     else if (poll_res == 0) // No Answer received
@@ -579,26 +560,12 @@ modbus_response_return_val_t receive_write_single_reg_response(uint16_t *address
 
     if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == -1)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
     }
 
-    if ((modbus_buffer[7] & MODBUS_ERROR_BIT_VALUE))
+    if((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
     {
-        error = parse_error(modbus_buffer);
-        if (error == MODBUS_ERROR_INVALID_ADDRESS)
-        {
-            return MODBUS_RESPONSE_ILLEGAL_ADDRESS; // Invalid Address Error
-        }
-        else if (error == MODBUS_ERROR_FUNCTION_CODE_WRONG)
-        {
-            printf("Wrong Function Code\n");
-            return MODBUS_RESPONSE_ILLEGAL_FUNCTION;
-        }
-        else
-        {
-            return MODBUS_RESPONSE_GENERAL_ERROR; // We don't identify other errorss
-        }
+        return modbus_response_error;
     }
 
     parse_write_single_response(modbus_buffer);
@@ -618,13 +585,12 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
 {
     int poll_res;
     ssize_t recv_size;
-    modbus_error_t error;
+    modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
     if ((poll_res = check_input_buffer(sfd)) < 0)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
     else if (poll_res == 0) // No Answer received
@@ -635,26 +601,12 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
 
     if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == -1)
     {
-        freeaddrinfo(res);
-        close(sfd);
+        close_connection();
     }
 
-    if ((modbus_buffer[7] & MODBUS_ERROR_BIT_VALUE))
+    if((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
     {
-        error = parse_error(modbus_buffer);
-        if (error == MODBUS_ERROR_INVALID_ADDRESS)
-        {
-            return MODBUS_RESPONSE_ILLEGAL_ADDRESS; // Invalid Address Error
-        }
-        else if (error == MODBUS_ERROR_FUNCTION_CODE_WRONG)
-        {
-            printf("Wrong Function Code\n");
-            return MODBUS_RESPONSE_ILLEGAL_FUNCTION;
-        }
-        else
-        {
-            return MODBUS_RESPONSE_GENERAL_ERROR; // We don't identify other errorss
-        }
+        return modbus_response_error;
     }
 
     parse_write_mult_response(modbus_buffer);
@@ -667,6 +619,39 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
     return MODBUS_RESPONSE_OK;
 }
 
+/*****************************************************************************/
+void close_connection(void)
+{
+    freeaddrinfo(res);
+    close(sfd);
+}
+
+/*****************************************************************************/
+static modbus_response_return_val_t check_error(uint8_t * modbus_buffer)
+{
+    modbus_response_return_val_t modbus_response_return = MODBUS_RESPONSE_OK;
+    modbus_error_t modbus_error;
+
+    if ((modbus_buffer[7] & MODBUS_ERROR_BIT_VALUE))
+    {
+        modbus_error = parse_error(modbus_buffer);
+        if (modbus_error == MODBUS_ERROR_INVALID_ADDRESS)
+        {
+            modbus_response_return = MODBUS_RESPONSE_ILLEGAL_ADDRESS; // Invalid Address Error
+        }
+        else if (modbus_error == MODBUS_ERROR_FUNCTION_CODE_WRONG)
+        {
+            printf("Wrong Function Code\n");
+            modbus_response_return = MODBUS_RESPONSE_ILLEGAL_FUNCTION;
+        }
+        else
+        {
+            modbus_response_return = MODBUS_RESPONSE_GENERAL_ERROR; // We don't identify other errors
+        }
+    }
+
+    return modbus_response_return;
+}
 /*****************************************************************************/
 static void parse_read_data(uint8_t *data)
 {

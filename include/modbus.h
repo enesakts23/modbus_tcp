@@ -249,6 +249,13 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
                                                          uint16_t *num_of_recorded_regs);
 
 /*****************************************************************************/
+/**
+ * @brief Closes connection to modbus server by releasing socket file 
+ * descriptor and data taken with getaddrinfo.
+ * @return [void] 
+ */
+void close_connection(void);
 
+/*****************************************************************************/
 
 #endif
