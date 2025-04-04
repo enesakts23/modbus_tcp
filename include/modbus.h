@@ -175,7 +175,10 @@ modbus_req_return_val_t send_write_mult_req(modbus_functions_t modbus_func,
  * least big as data requested. maximum size limit is 251 byte which is
  * indicated with macro MODBUS_RECEIVE_MAX_DATA_SIZE. 
  * @param[out] data_length [uint8_t *] the size of data at response. the 
- * function will fill this parameter.
+ * function will fill this parameter. it'll get how many bytes are returned
+ * for example if you read 10 coils or discrete inputs. This parameter
+ * will be 2 bytes. If you read registers. You'll get ,
+ * (register count * 2) because every register is 2 byte
  * @return [modbus_response_return_val_t] returns response errors or
  * MODBUS_RESPONSE_OK.
  */

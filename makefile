@@ -58,6 +58,7 @@ WARN=-Wall -Wextra -Werror -Wwrite-strings -Wno-parentheses \
      -Wno-unused-parameter -Wno-unused-result
 
 CCFLAGS = $(STDFLAG) $(BUILD_TYPE) $(DEFINES) $(WARN) $(INC)
+CCFLAGS += $(shell pkg-config --cflags check)
 
 ########## CC FLAGS END ##########
 
@@ -76,13 +77,15 @@ CCFLAGS = $(STDFLAG) $(BUILD_TYPE) $(DEFINES) $(WARN) $(INC)
 #RPATH="-Wl,-rpath,$(TARGET_DIR)"
 
 LDFLAGS = $(DEP_LIBS) $(RPATH)
-LDFLAGS_PROFILING = $(DEP_LIBS) $(RPATH) -pgbu
+LDFLAGS += $(shell pkg-config --libs check)
+
+# LDFLAGS_PROFILING = $(DEP_LIBS) $(RPATH) -pgbu
 
 ########## LINKER FLAGS END ##########
 
 # It creates target
 $(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $(TARGET)
+	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
 # it creates obj files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
