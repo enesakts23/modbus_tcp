@@ -184,7 +184,7 @@ void WriteToPCServeWriteSingleCoil(void)
     }
 
     uint16_t address_received;
-    write_single_req_value_t value;
+    write_single_coil_value_t value;
 
     if(receive_write_single_coil_response(&address_received, &value) != MODBUS_RESPONSE_OK)
     {
