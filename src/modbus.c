@@ -123,6 +123,15 @@ typedef struct __attribute__((packed)) st_write_mult_resp_package_t
     uint8_t number_of_recorded_reg_low;
 } write_mult_resp_package_t;
 
+/* Modbus Error Type*/
+typedef enum e_modbus_error_t
+{
+    MODBUS_ERROR_NONE = 0x00,
+    MODBUS_ERROR_FUNCTION_CODE_WRONG = 0x01,
+    MODBUS_ERROR_ILLEGAL_ADDRESS = 0x02,
+    MODBUS_ERROR_UNKNOWN_ERROR = 0x03,
+} modbus_error_t;
+
 /* Maximum Package Size of Modbus */
 #define MODBUS_PACKAGE_MAX_SIZE 260
 /* Corresponding bit means error on modbus tcp */
@@ -158,26 +167,25 @@ typedef struct __attribute__((packed)) st_write_mult_resp_package_t
     0,                                                                 \
     0}
 
-#define WRITE_MULT_REQ_PACKAGE_DEFAULT (write_mult_req_package_t)       \
-{                                                                       \
-    0x01,                                                               \
-    0x02,                                                               \
-    0x00,                                                               \
-    0x00,                                                               \
-    0x00,                                                               \
-    0x00,                                                               \
-    0x01,                                                               \
-    0,                                                                  \
-    0,                                                                  \
-    0,                                                                  \
-    0,                                                                  \
-    0,                                                                  \
-    0,                                                                  \
-/* NULL */                                                              \
-}
+#define WRITE_MULT_REQ_PACKAGE_DEFAULT  (write_mult_req_package_t)  \
+    {                                                               \
+        0x01,                                                       \
+        0x02,                                                       \
+        0x00,                                                       \
+        0x00,                                                       \
+        0x00,                                                       \
+        0x00,                                                       \
+        0x01,                                                       \
+        0,                                                          \
+        0,                                                          \
+        0,                                                          \
+        0,                                                          \
+        0,                                                          \
+        0,                                                          \
+    /* NULL */                                                      \
+    }       
 
 /*****************************************************************************/
-
 /**
  * @brief Checks if any error returned at response from modbus server
  * @details Can only detect illegal address or illegal function. All other
@@ -189,6 +197,7 @@ typedef struct __attribute__((packed)) st_write_mult_resp_package_t
  * errors will be returned as MODBUS_RESPONSE_GENERAL_ERROR.
  */
 static modbus_response_return_val_t check_error(uint8_t *modbus_buffer);
+
 /*****************************************************************************/
 /**
  * @brief Parses given data into a read_mult_resp_package_t structure which is used
@@ -702,10 +711,12 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
 
     parse_write_mult_response(modbus_buffer);
     /* We are returning the number of recorded regs. */
-    *num_of_recorded_regs = (((uint16_t)write_mult_response_package.number_of_recorded_reg_high) << 8) + ((uint16_t)write_mult_response_package.number_of_recorded_reg_low);
-    /* We are returning address returned so we can if it's address is
+    *num_of_recorded_regs = (((uint16_t)write_mult_response_package.number_of_recorded_reg_high) << 8) +
+                            ((uint16_t)write_mult_response_package.number_of_recorded_reg_low);
+    /* We are returning address returned so we can know if its address is
     right or not in the application*/
-    *address = (((uint16_t)write_mult_response_package.address_high) << 8) + ((uint16_t)write_mult_response_package.address_low);
+    *address = (((uint16_t)write_mult_response_package.address_high) << 8) +
+               ((uint16_t)write_mult_response_package.address_low);
 
     return MODBUS_RESPONSE_OK;
 }
@@ -726,7 +737,7 @@ static modbus_response_return_val_t check_error(uint8_t *modbus_buffer)
     if ((modbus_buffer[7] & MODBUS_ERROR_BIT_VALUE))
     {
         modbus_error = parse_error(modbus_buffer);
-        if (modbus_error == MODBUS_ERROR_INVALID_ADDRESS)
+        if (modbus_error == MODBUS_ERROR_ILLEGAL_ADDRESS)
         {
             modbus_response_return = MODBUS_RESPONSE_ILLEGAL_ADDRESS; // Invalid Address Error
         }

@@ -40,7 +40,7 @@ typedef enum e_modbus_req_return_val_t
     MODBUS_REQ_COMMUNICATION_PROBLEM, // Communication problem
     MODBUS_REQ_WRONG_VALUE,           // Wrong Value Entered
 } modbus_req_return_val_t;
-
+  
 typedef enum e_modbus_response_return_val_t
 {
     MODBUS_RESPONSE_OK,
@@ -51,14 +51,6 @@ typedef enum e_modbus_response_return_val_t
     MODBUS_RESPONSE_ILLEGAL_FUNCTION, // Server responded Wrong Function Code(0x01)
     MODBUS_RESPONSE_ILLEGAL_ADDRESS,  // Server responded Invalid Address(0x02)
 } modbus_response_return_val_t;
-
-typedef enum e_modbus_error_t
-{
-    MODBUS_ERROR_NONE = 0x00,
-    MODBUS_ERROR_FUNCTION_CODE_WRONG = 0x01,
-    MODBUS_ERROR_INVALID_ADDRESS = 0x02,
-    MODBUS_ERROR_UNKNOWN_ERROR = 0x03,
-} modbus_error_t;
 
 /*****************************************************************************/
 /**
