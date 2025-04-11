@@ -279,8 +279,9 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
 
 /*****************************************************************************/
 /**
- * @brief Closes connection to modbus server by releasing socket file
- * descriptor and data taken with getaddrinfo.
+ * @brief Returns resources used while communicating. Must be called after
+ * communication errors. Must be called for terminating communication.
+ * @details Closes connection by releasing resources used for communication.
  * @return [void]
  */
 void close_connection(void);

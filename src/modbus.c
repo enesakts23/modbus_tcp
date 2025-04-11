@@ -137,6 +137,9 @@ typedef enum e_modbus_error_t
 /* Corresponding bit means error on modbus tcp */
 #define MODBUS_ERROR_BIT_VALUE 0x80
 
+// Default Modbus Port Number
+#define SERVER_PORT "502"       
+
 /* Used to fill read request package at beginning*/
 /* Transaction ID Must be changed with every request. Will be applied later. */
 #define READ_REQ_PACKAGE_DEFAULT (read_req_package_t){ \
@@ -168,30 +171,30 @@ typedef enum e_modbus_error_t
     0}
 
 #define WRITE_MULT_REQ_PACKAGE_DEFAULT  (write_mult_req_package_t)  \
-    {                                                               \
-        0x01,                                                       \
-        0x02,                                                       \
-        0x00,                                                       \
-        0x00,                                                       \
-        0x00,                                                       \
-        0x00,                                                       \
-        0x01,                                                       \
-        0,                                                          \
-        0,                                                          \
-        0,                                                          \
-        0,                                                          \
-        0,                                                          \
-        0,                                                          \
+{                                                                   \
+    0x01,                                                           \
+    0x02,                                                           \
+    0x00,                                                           \
+    0x00,                                                           \
+    0x00,                                                           \
+    0x00,                                                           \
+    0x01,                                                           \
+    0,                                                              \
+    0,                                                              \
+    0,                                                              \
+    0,                                                              \
+    0,                                                              \
+    0,                                                              \
     /* NULL */                                                      \
-    }       
+}
 
 /*****************************************************************************/
 /**
  * @brief Checks if any error returned at response from modbus server
  * @details Can only detect illegal address or illegal function. All other
  * errors are not identified and returned as general error.
- * @param[in] modbus_buffer [uint8_t *] data array which is holding the received
- * data from tcp.
+ * @param[in] modbus_buffer [uint8_t *] data array which is holding the 
+ * received data from tcp.
  * @return [modbus_response_return_val_t] returns MODBUS_RESPONSE_OK in no
  * error situation. Can return illegal address or illegal function. Other
  * errors will be returned as MODBUS_RESPONSE_GENERAL_ERROR.
@@ -200,8 +203,8 @@ static modbus_response_return_val_t check_error(uint8_t *modbus_buffer);
 
 /*****************************************************************************/
 /**
- * @brief Parses given data into a read_mult_resp_package_t structure which is used
- * in this module to parse received register data from modbus.
+ * @brief Parses given data into a read_mult_resp_package_t structure which is 
+ * used in this module to parse received register data from modbus.
  * @details it parses data to a structure named read_mult_response_package
  * which is type of read_mult_resp_package_t. Then that structure is used to
  * return received values.
@@ -257,16 +260,12 @@ static void parse_write_mult_response(uint8_t *data);
  * function doesn't check if any error occured or not.
  * @param[in] data [uint8_t *] data array which is holding the received data
  * from modbus tcp and has the error type in it.
- * @return [modbus_error_t] it returns error type but doesn't provide every type
- * of modbus error for now. it only indicates if error is function code wrong or
- * invalid address. Otherwise it only returns it as unknown error. And if the
- * error check is made carefully it can't return MODBUS_ERROR_NONE.
+ * @return [modbus_error_t] it returns error type but doesn't provide every 
+ * type of modbus error for now. it only indicates if error is function code 
+ * wrong or invalid address. Otherwise it only returns it as unknown error, 
+ * and if the error check is made carefully it can't return MODBUS_ERROR_NONE.
  */
 static modbus_error_t parse_error(uint8_t *data);
-
-/*****************************************************************************/
-/* This function will be deleted later. Used for debugging purpose. */
-static void print_sent_package(uint8_t *package, uint8_t package_size);
 
 /*****************************************************************************/
 
@@ -279,41 +278,23 @@ static write_mult_resp_package_t write_mult_response_package;
 /* Buffer to use with TCP/IP */
 static uint8_t modbus_buffer[MODBUS_PACKAGE_MAX_SIZE];
 
-/* TCP/IP communication variables*/
-static struct addrinfo *res;
-static int sfd;
+static tcp_client_t* client;
 
 /* Function Definitions */
 /*****************************************************************************/
 int connect_to_modbus_server(const char *connection_address)
-{
-    int error_holder;
+{    
+    client = tcp_client_create();
 
-    error_holder = get_addr_info(connection_address, &res);
-
-    if ((error_holder) == 0)
+    if(tcp_client_init(client,  connection_address, SERVER_PORT) != 0)
     {
-        printf("Getted Addr Info\n");
-    }
-    else
-    {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(error_holder));
         return -1;
     }
 
-    sfd = create_socket(res);
+    tcp_client_set_socket_nonblocking(client);
 
-    if (sfd == -1)
+    if (tcp_client_connect_to_server(client) != 0)
     {
-        freeaddrinfo(res);
-        return -1;
-    }
-
-    set_socket_nonblocking(sfd);
-
-    if (connect_to_server(sfd, res) != 0)
-    {
-        printf("Can't connect to server\n");
         close_connection();
         return -1;
     }
@@ -324,9 +305,8 @@ int connect_to_modbus_server(const char *connection_address)
 /*****************************************************************************/
 int check_modbus_server_connection(void)
 {
-    if (check_connection(sfd) == -1)
+    if (tcp_client_check_connection(client) == -1)
     {
-        close_connection();
         return -1;
     }
 
@@ -355,11 +335,10 @@ modbus_req_return_val_t send_read_req(modbus_functions_t modbus_func,
     read_req_pack.number_of_regs_high = 0x00;
     read_req_pack.number_of_regs_low = (uint8_t)length;
 
-    print_sent_package((uint8_t *)&read_req_pack, (uint8_t)sizeof(read_req_package_t));
-
-    if (send_data_to_server(sfd, (uint8_t *)&read_req_pack, sizeof(read_req_package_t)) == -1)
+    if (tcp_client_send_data_to_server(client,
+                            (uint8_t *)&read_req_pack,
+                            sizeof(read_req_package_t)) == -1)
     {
-        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -386,11 +365,8 @@ modbus_req_return_val_t send_write_single_coil_req(uint16_t address,
     write_req_pack.address_high = (uint8_t)((address & (uint16_t)0xFF00) >> 8);
     write_req_pack.address_low = (uint8_t)(address & 0x00FF);
 
-    print_sent_package((uint8_t *)&write_req_pack, (uint8_t)sizeof(write_single_req_package_t));
-
-    if (send_data_to_server(sfd, (uint8_t *)&write_req_pack, sizeof(write_single_req_package_t)) == -1)
+    if (tcp_client_send_data_to_server(client, (uint8_t *)&write_req_pack, sizeof(write_single_req_package_t)) == -1)
     {
-        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -409,11 +385,8 @@ modbus_req_return_val_t send_write_single_reg_req(uint16_t address,
     write_req_pack.byte_meaning_high = (uint8_t)((value & (uint16_t)0xFF00) >> 8);
     write_req_pack.byte_meaning_low = (uint8_t)(value & 0x00FF);
 
-    print_sent_package((uint8_t *)&write_req_pack, (uint8_t)sizeof(write_single_req_package_t));
-
-    if (send_data_to_server(sfd, (uint8_t *)&write_req_pack, sizeof(read_req_package_t)) == -1)
+    if (tcp_client_send_data_to_server(client, (uint8_t *)&write_req_pack, sizeof(read_req_package_t)) == -1)
     {
-        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -445,11 +418,8 @@ modbus_req_return_val_t send_write_mult_coils_req(uint16_t start_address,
     memcpy(modbus_buffer, &write_mult_req_pack, sizeof(write_mult_req_package_t));
     memcpy((modbus_buffer + sizeof(write_mult_req_package_t)), data, (size_t)write_mult_req_pack.number_of_bytes_more);
 
-    print_sent_package((uint8_t *)modbus_buffer, (uint8_t)(sizeof(write_mult_req_package_t) + (size_t)write_mult_req_pack.number_of_bytes_more)); // Will be deleted
-
-    if (send_data_to_server(sfd, (uint8_t *)&modbus_buffer, (sizeof(write_mult_req_package_t) + (size_t)write_mult_req_pack.number_of_bytes_more)) == -1)
+    if (tcp_client_send_data_to_server(client, (uint8_t *)&modbus_buffer, (sizeof(write_mult_req_package_t) + (size_t)write_mult_req_pack.number_of_bytes_more)) == -1)
     {
-        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -480,11 +450,8 @@ modbus_req_return_val_t send_write_mult_reg_req(uint16_t start_address,
         modbus_buffer[sizeof(write_mult_req_package_t) + (2 * i) + 1] = (uint8_t)(data[i] & 0x00FF);
     }
 
-    print_sent_package((uint8_t *)modbus_buffer, (uint8_t)(sizeof(write_mult_req_package_t) + (size_t)write_mult_req_pack.number_of_bytes_more)); // Will be deleted
-
-    if (send_data_to_server(sfd, (uint8_t *)&modbus_buffer, (sizeof(write_mult_req_package_t) + (size_t)write_mult_req_pack.number_of_bytes_more)) == -1)
+    if (tcp_client_send_data_to_server(client, (uint8_t *)&modbus_buffer, (sizeof(write_mult_req_package_t) + (size_t)write_mult_req_pack.number_of_bytes_more)) == -1)
     {
-        close_connection();
         return MODBUS_REQ_COMMUNICATION_PROBLEM;
     }
 
@@ -500,9 +467,9 @@ modbus_response_return_val_t receive_read_coils_or_inputs_response(uint8_t *data
     modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
-    if ((poll_res = check_input_buffer(sfd)) > 0)
+    if ((poll_res = tcp_client_check_input_buffer(client)) > 0)
     {
-        if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == 0)
+        if (tcp_client_receive_data_from_server(client, modbus_buffer, &recv_size) == 0)
         {
             if ((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
             {
@@ -518,12 +485,10 @@ modbus_response_return_val_t receive_read_coils_or_inputs_response(uint8_t *data
     }
     else if (poll_res == 0)
     {
-        printf("No Answer From Modbus Server\n");
         return MODBUS_RESPONSE_NO_ANSWER_YET; // No Answer Yet.
     }
     else
     {
-        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
 
@@ -539,9 +504,9 @@ modbus_response_return_val_t receive_read_registers_response(uint16_t *data_rece
     modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
-    if ((poll_res = check_input_buffer(sfd)) > 0)
+    if ((poll_res = tcp_client_check_input_buffer(client)) > 0)
     {
-        if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == 0)
+        if (tcp_client_receive_data_from_server(client, modbus_buffer, &recv_size) == 0)
         {
             if ((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
             {
@@ -563,12 +528,10 @@ modbus_response_return_val_t receive_read_registers_response(uint16_t *data_rece
     }
     else if (poll_res == 0)
     {
-        printf("No Answer From Modbus Server\n");
         return MODBUS_RESPONSE_NO_ANSWER_YET; // No Answer Yet.
     }
     else
     {
-        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
 
@@ -584,9 +547,9 @@ modbus_response_return_val_t receive_write_single_coil_response(uint16_t *addres
     modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
-    if ((poll_res = check_input_buffer(sfd)) > 0)
+    if ((poll_res = tcp_client_check_input_buffer(client)) > 0)
     {
-        if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == 0)
+        if (tcp_client_receive_data_from_server(client, modbus_buffer, &recv_size) == 0)
         {
             if ((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
             {
@@ -626,12 +589,10 @@ modbus_response_return_val_t receive_write_single_coil_response(uint16_t *addres
     }
     else if (poll_res == 0) // No Answer received
     {
-        printf("No Answer From Modbus Server\n");
         return MODBUS_RESPONSE_NO_ANSWER_YET; // No Answer Yet.
     }
     else // means poll_res < 0 and that means communication error.
     {
-        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
 
@@ -647,20 +608,18 @@ modbus_response_return_val_t receive_write_single_reg_response(uint16_t *address
     modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
-    if ((poll_res = check_input_buffer(sfd)) < 0)
+    if ((poll_res = tcp_client_check_input_buffer(client)) < 0)
     {
-        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
     else if (poll_res == 0) // No Answer received
     {
-        printf("No Answer From Modbus Server\n");
         return MODBUS_RESPONSE_NO_ANSWER_YET; // No Answer Yet.
     }
 
-    if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == -1)
+    if (tcp_client_receive_data_from_server(client, modbus_buffer, &recv_size) == -1)
     {
-        close_connection();
+        return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
 
     if ((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
@@ -688,20 +647,18 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
     modbus_response_return_val_t modbus_response_error;
 
     // if 0 it can be still waiting but it should answer(in modbus tcp)
-    if ((poll_res = check_input_buffer(sfd)) < 0)
+    if ((poll_res = tcp_client_check_input_buffer(client)) < 0)
     {
-        close_connection();
         return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
     else if (poll_res == 0) // No Answer received
     {
-        printf("No Answer From Modbus Server\n");
         return MODBUS_RESPONSE_NO_ANSWER_YET; // No Answer Yet.
     }
 
-    if (receive_data_from_server(sfd, modbus_buffer, &recv_size) == -1)
+    if (tcp_client_receive_data_from_server(client, modbus_buffer, &recv_size) == -1)
     {
-        close_connection();
+        return MODBUS_RESPONSE_COMMUNICATION_PROBLEM;
     }
 
     if ((modbus_response_error = check_error(modbus_buffer)) != MODBUS_RESPONSE_OK)
@@ -724,8 +681,7 @@ modbus_response_return_val_t receive_write_mult_response(uint16_t *address,
 /*****************************************************************************/
 void close_connection(void)
 {
-    freeaddrinfo(res);
-    close(sfd);
+    tcp_client_close_connection(client);
 }
 
 /*****************************************************************************/
@@ -743,7 +699,6 @@ static modbus_response_return_val_t check_error(uint8_t *modbus_buffer)
         }
         else if (modbus_error == MODBUS_ERROR_FUNCTION_CODE_WRONG)
         {
-            printf("Wrong Function Code\n");
             modbus_response_return = MODBUS_RESPONSE_ILLEGAL_FUNCTION;
         }
         else
@@ -796,16 +751,6 @@ static modbus_error_t parse_error(uint8_t *data)
     }
 
     return (modbus_error_t)error_val;
-}
-
-/*****************************************************************************/
-static void print_sent_package(uint8_t *package, uint8_t package_size)
-{
-    // Print Data Sent for Debug
-    for (uint8_t i = 0; i < package_size; i++)
-    {
-        printf("Data %d = 0x%.2x\n", i, package[i]);
-    }
 }
 
 /*****************************************************************************/
