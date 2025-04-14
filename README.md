@@ -15,6 +15,12 @@ Always check connection and returned errors. Don't forget to close connection.
 
 ### Installation of Server
 
+pkg-config is used to locate library files at differents systems. if you don't have it
+you can install it with:
+
+```bash
+sudo apt install pkg-config
+```
 Details about server's library can be found at [`libmodbus`](https://libmodbus.org/)
 
 Install libmodbus library with this command.
