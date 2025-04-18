@@ -3,18 +3,32 @@
 # Date: 18.03.2025
 # Details:
 
-BUILD_TYPE = $(RELEASE)
+# BUILD_TYPE = $(RELEASE)
 #BUILD_TYPE = $(DEBUG)
 
-SRC_NAME:= main
-TARGET_NAME:= my_prog
+BUILD_TYPE_VAR ?= RELEASE
+
+ifeq ($(BUILD_TYPE_VAR), DEBUG)
+# CFLAGS = -Wall -Wextra -g -std=c99
+BUILD_TYPE = $(DEBUG)
+TARGET_NAME = myprog_debug
+OBJ_FOLDER=debug
+else
+# CFLAGS = -Wall -Wextra -O2 -std=c99
+BUILD_TYPE = $(RELEASE)
+TARGET_NAME = myprog
+OBJ_FOLDER=release
+endif
+
+# SRC_NAME:= main
+# TARGET_NAME:= my_prog
 
 CC:= gcc
 LD:= gcc
 
 # Directories 
 PROJ_ROOT_DIR:= .
-OBJ_DIR:= $(PROJ_ROOT_DIR)/obj
+OBJ_DIR:= $(PROJ_ROOT_DIR)/obj/$(OBJ_FOLDER)
 INC_DIR:= $(PROJ_ROOT_DIR)/include
 SRC_DIR:=$(PROJ_ROOT_DIR)/src
 DEP_DIR:=$(PROJ_ROOT_DIR)/dep
@@ -58,7 +72,7 @@ WARN=-Wall -Wextra -Werror -Wwrite-strings -Wno-parentheses \
      -Wno-unused-parameter -Wno-unused-result
 
 CCFLAGS = $(STDFLAG) $(BUILD_TYPE) $(DEFINES) $(WARN) $(INC)
-CCFLAGS += $(shell pkg-config --cflags check)
+CCFLAGS += $(shell pkg-config --cflags ncursesw)
 
 ########## CC FLAGS END ##########
 
@@ -78,6 +92,7 @@ CCFLAGS += $(shell pkg-config --cflags check)
 
 LDFLAGS = $(DEP_LIBS) $(RPATH)
 LDFLAGS += $(shell pkg-config --libs check)
+LDFLAGS += $(shell pkg-config --libs ncursesw)
 
 # LDFLAGS_PROFILING = $(DEP_LIBS) $(RPATH) -pgbu
 
@@ -111,6 +126,7 @@ clean:
 # rm -rf $(OBJ_DIR)
 	rm -f $(DEP_DIR)/*
 	rm -f $(BIN_DIR)/*
-	rm -f $(OBJ_DIR)/*
+	rm -f $(PROJ_ROOT_DIR)/obj/debug/*
+	rm -f $(PROJ_ROOT_DIR)/obj/release/*
 
 .phony: build_dir build_dependencies install clean run

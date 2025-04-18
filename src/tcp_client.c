@@ -145,11 +145,31 @@ int tcp_client_connect_to_server(tcp_client_t *client)
 /*****************************************************************************/
 int tcp_client_check_connection(tcp_client_t *client)
 {
-    char buffer[1];
-    // checks if connection is lost or not
-    if (recv(client->sockfd, buffer, 1, MSG_PEEK) == 0)
+    struct pollfd pfd;
+    pfd.fd = client->sockfd;
+    pfd.events = POLLIN | POLLERR | POLLHUP | POLLRDHUP;
+
+    int ret = poll(&pfd, 1, 0); // timeout is 0 so it returns immediately
+
+    if (ret > 0)
     {
-        return -1;
+        if (pfd.revents & (POLLERR | POLLHUP | POLLRDHUP))
+        {
+            return -1;
+        }
+
+        // is the connection closed or any different error occured check
+        char buffer[1];
+        ret = recv(client->sockfd, buffer, 1, MSG_PEEK | MSG_DONTWAIT);
+        if (ret == 0)
+        {
+            return -1; // peer closed properly
+            
+        }
+        else if (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            return -1; // another recv error occured
+        }
     }
 
     return 0;
@@ -161,7 +181,7 @@ int tcp_client_send_data_to_server(tcp_client_t *client,
                                    size_t data_size)
 {
     int packet_send;
-
+    
     if ((packet_send = send(client->sockfd, data_buffer, data_size, 0)) == -1)
     {
         printf("Value of errno: %d\n", errno);
