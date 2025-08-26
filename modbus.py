@@ -1,5 +1,6 @@
 """
-C kodundan port edilmiş Modbus TCP İstemci
+C kodundan port edilmiş Modbus TCP Master (Client)
+Bu sınıf komut gönderen ve veri talep eden taraftır
 """
 from enum import Enum
 import struct
@@ -39,13 +40,13 @@ class ModbusError(Enum):
     NO_RESPONSE = 6
     WRONG_DATA = 7
 
-class ModbusClient:
+class ModbusMaster:
     def __init__(self):
         self.tcp_client = TCPClient()
         self.transaction_id = 0
 
     def connect(self, host: str, port: int = 502) -> bool:
-        """C kodundaki connect_to_modbus_server karşılığı"""
+        """Modbus Slave'e bağlan"""
         if self.tcp_client.init(host, port) != 0:
             return False
         return self.tcp_client.connect_to_server() == 0
