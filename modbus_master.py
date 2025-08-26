@@ -21,7 +21,7 @@ def main():
     master = ModbusMaster()
     
     # Slave'e bağlan
-    if not master.connect("localhost", 1024):
+    if not master.connect("10.134.20.219", 1024):
         print("Slave'e bağlanılamadı")
         return
     
