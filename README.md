@@ -1,79 +1,216 @@
-# modbus_tcp
-Modbus TCP Client Project with modular structure to use with any kind of TCP Communication.
-The purpose of this library is having a library that can be used with any device(for example; STM)
-or technology(for example; Qt) that has tcp/ip communication ability.
-It includes functions to connect and manipulate modbus server data and is built with `Make`. 
-Unit tests are written using the `Check` testing framework.
-Tests are made with a modbus server that runs on same device. That server is written with
-`libmodbus` library. The code of server is in folders. Have to build and run it to
-run unit tests.
+# Modbus TCP İstemci/Sunucu Uygulaması
 
-## Usage
+Bu proje, Modbus TCP protokolünü kullanan bir istemci ve sunucu uygulamasıdır. Python dilinde yazılmış olup, endüstriyel cihazlarla haberleşme için kullanılabilir.
 
-Details of usage can be found at function descriptions and in unit test.
-Always check connection and returned errors. Don't forget to close connection. 
+## Proje Yapısı
 
-### Installation of Server
+Proje aşağıdaki ana dosyalardan oluşmaktadır:
 
-pkg-config is used to locate library files at differents systems. if you don't have it
-you can install it with:
+- `tcp_client.py`: TCP soket haberleşmesini yöneten temel sınıf
+- `modbus.py`: Modbus protokol işlemlerini gerçekleştiren ana sınıf
+- `modbus_server.py`: Test amaçlı Modbus TCP sunucusu
+- `example.py`: Örnek kullanımları gösteren test scripti
 
+## Kurulum
+
+1. Gerekli Python paketlerini yükleyin:
 ```bash
-sudo apt install pkg-config
-```
-Details about server's library can be found at [`libmodbus`](https://libmodbus.org/)
-
-Install libmodbus library with this command.
-
-```bash
-sudo apt install libmodbus-dev
+pip install -r requirements.txt
 ```
 
-go to server_code by
+## Kullanım
 
+### Sunucuyu Başlatma
+
+Test sunucusunu başlatmak için:
 ```bash
-cd modbus_tcp_server
+python3 modbus_server.py
+```
+Sunucu varsayılan olarak localhost üzerinde 1024 portunda çalışacaktır.
+
+### İstemciyi Çalıştırma
+
+Örnek istemci uygulamasını çalıştırmak için:
+```bash
+python3 example.py
 ```
 
-build by
+## Modbus Harita Yapısı
 
-```bash
-make
+### Holding Register Adresleri (4xxxx)
+
+#### Sistem Kontrol Registerleri (0-99)
+- 0: Sistem durumu
+- 1: Sistem komut registeri
+- 2: Hata kodu
+- 3: Çalışma modu
+
+#### Sıcaklık Kontrol Registerleri (100-199)
+- 100: Sıcaklık ayar değeri
+- 101: Sıcaklık kontrol modu
+- 102: Sıcaklık P kazancı
+- 103: Sıcaklık I kazancı
+- 104: Sıcaklık D kazancı
+
+#### Basınç Kontrol Registerleri (200-299)
+- 200: Basınç ayar değeri
+- 201: Basınç kontrol modu
+- 202: Basınç P kazancı
+- 203: Basınç I kazancı
+- 204: Basınç D kazancı
+
+#### Alarm Limitleri (300-399)
+- 300: Yüksek sıcaklık alarmı
+- 301: Düşük sıcaklık alarmı
+- 302: Yüksek basınç alarmı
+- 303: Düşük basınç alarmı
+
+### Input Register Adresleri (3xxxx)
+
+#### Sistem Durum Registerleri (0-99)
+- 0: Sistem çalışma süresi
+- 1: Sistem durum bilgisi
+- 2: Hata durum bilgisi
+- 3: Uyarı durum bilgisi
+
+#### Sıcaklık Ölçüm Registerleri (100-199)
+- 100: Anlık sıcaklık değeri
+- 101: İşlenmemiş sıcaklık değeri
+- 102: Minimum sıcaklık değeri
+- 103: Maksimum sıcaklık değeri
+- 104: Ortalama sıcaklık değeri
+
+#### Basınç Ölçüm Registerleri (200-299)
+- 200: Anlık basınç değeri
+- 201: İşlenmemiş basınç değeri
+- 202: Minimum basınç değeri
+- 203: Maksimum basınç değeri
+- 204: Ortalama basınç değeri
+
+### Coil Adresleri (0xxxx)
+
+#### Sistem Kontrol Coilleri (0-99)
+- 0: Sistem aktif/pasif
+- 1: Alarm reset
+- 2: Acil stop
+- 3: Bakım modu
+
+#### Sıcaklık Kontrol Coilleri (100-199)
+- 100: Sıcaklık kontrolü aktif/pasif
+- 101: Sıcaklık otomatik mod
+- 102: Sıcaklık manuel mod
+
+#### Basınç Kontrol Coilleri (200-299)
+- 200: Basınç kontrolü aktif/pasif
+- 201: Basınç otomatik mod
+- 202: Basınç manuel mod
+
+### Discrete Input Adresleri (1xxxx)
+
+#### Sistem Durum Girdileri (0-99)
+- 0: Güç durumu
+- 1: Sistem hazır
+- 2: Alarm aktif
+- 3: Uyarı aktif
+
+#### Sıcaklık Durum Girdileri (100-199)
+- 100: Sıcaklık sensörü durumu
+- 101: Yüksek sıcaklık limiti
+- 102: Düşük sıcaklık limiti
+
+#### Basınç Durum Girdileri (200-299)
+- 200: Basınç sensörü durumu
+- 201: Yüksek basınç limiti
+- 202: Düşük basınç limiti
+
+## Fonksiyonlar ve Kullanımları
+
+### ModbusClient Sınıfı
+
+```python
+from modbus import ModbusClient
+
+# İstemci oluşturma
+client = ModbusClient()
+
+# Sunucuya bağlanma
+client.connect("localhost", 1024)
+
+# Coil okuma (adres 0'dan başlayarak 10 adet)
+error, coils = client.read_coils(0, 10)
+
+# Register okuma (adres 100'den başlayarak 5 adet)
+error, registers = client.read_holding_registers(100, 5)
+
+# Tek coil yazma (adres 0'a True değeri yazma)
+error = client.write_single_coil(0, True)
+
+# Tek register yazma (adres 100'e 12345 değeri yazma)
+error = client.write_single_register(100, 12345)
+
+# Çoklu coil yazma
+coil_values = [True, False, True, True, False]
+error = client.write_multiple_coils(10, coil_values)
+
+# Çoklu register yazma
+register_values = [111, 222, 333, 444, 555]
+error = client.write_multiple_registers(200, register_values)
+
+# Bağlantıyı kapatma
+client.close()
 ```
 
-run by
+## Hata Kodları
 
+- `ModbusError.OK`: İşlem başarılı
+- `ModbusError.GENERAL_ERROR`: Genel hata
+- `ModbusError.ILLEGAL_FUNCTION`: Geçersiz fonksiyon kodu
+- `ModbusError.ILLEGAL_ADDRESS`: Geçersiz adres
+- `ModbusError.ILLEGAL_VALUE`: Geçersiz değer
+- `ModbusError.COMMUNICATION_ERROR`: Haberleşme hatası
+- `ModbusError.NO_RESPONSE`: Yanıt yok
+- `ModbusError.WRONG_DATA`: Yanlış veri formatı
+
+## Güvenlik Notları
+
+1. Port numarası seçimi:
+   - Linux sistemlerde 1024 altındaki portlar root yetkisi gerektirir
+   - Test için 1024 ve üzeri portları kullanın
+   - Gerçek cihazlar genelde 502 portunu kullanır (root yetkisi gerekir)
+
+2. Bağlantı güvenliği:
+   - Üretim ortamında güvenlik duvarı kurallarını kontrol edin
+   - Gerekirse SSL/TLS kullanın
+   - Uzak bağlantılarda IP kısıtlaması uygulayın
+
+## Test ve Hata Ayıklama
+
+Sistemin düzgün çalıştığını kontrol etmek için:
+
+1. Önce sunucuyu başlatın:
 ```bash
-sudo make run
+python3 modbus_server.py
 ```
 
-We are running it with sudo because we need superuser privileges to use port 502. 
-
-### Testing
-
-Tests are made with a unit test framework called [`Check`](https://libcheck.github.io/check/)
-create test program with
-
-installation instruction can be found [here](https://libcheck.github.io/check/web/install.html)
-
-Test code can be run after starting server by using commands: 
-
+2. Yeni bir terminal açın ve istemciyi çalıştırın:
 ```bash
-make
-make run
-```
-### Cleaning 
-
-You can clean all the outputs of building by
-```bash
-make clean
+python3 example.py
 ```
 
-## Future Improvements
-Transaction ID is always the same and doesn't check returned transaction ID.
-Additional code can be added to change transaction ID in every request and check the returning value to see if it matches or not.
-Returned Fucntion Codes can be checked maybe.
+3. Çıktıları kontrol edin:
+- Bağlantı durumu
+- Coil okuma/yazma sonuçları
+- Register okuma/yazma sonuçları
+- Hata mesajları
 
-### License
-Any License didn't provided because it is not a open source project. Additional libraries like check and libmodbus is only
-used in testing. So the code doesn't have any dependency on any library. Licensing can be made later.
+## Katkıda Bulunma
+
+1. Bu depoyu fork edin
+2. Yeni bir branch oluşturun (`git checkout -b yeni-ozellik`)
+3. Değişikliklerinizi commit edin (`git commit -am 'Yeni özellik eklendi'`)
+4. Branch'inizi push edin (`git push origin yeni-ozellik`)
+5. Pull Request oluşturun
+
+## Lisans
+
+Bu proje açık kaynak olarak lisanslanmıştır. Detaylar için LICENSE dosyasına bakın.
