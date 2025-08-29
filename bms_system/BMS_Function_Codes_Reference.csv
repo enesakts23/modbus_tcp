@@ -1,0 +1,28 @@
+Function Code (Hex),Function Code (Dec),Function Name,Data Type,Access Type,Max Quantity,Description,BMS Usage,Example Address,Implementation Status
+0x01,1,Read Coils,IEEE 754 Float,Read,125 registers,Read 32-bit float coil values,System status values,30003-30008,✅ Implemented
+0x02,2,Read Discrete Inputs,Boolean,Read,2000 inputs,Read discrete input contacts,Safety interlocks / Digital inputs,20001-20020,✅ Implemented
+0x03,3,Read Holding Registers,16-bit Words,Read,125 registers,Read analog output holding registers,Main BMS data / Cell voltages,1000-6001,✅ Implemented
+0x04,4,Read Input Registers,16-bit Words,Read,125 registers,Read analog input registers,Sensor readings / Status,N/A,❌ Not used
+0x05,5,Write Single Coil,IEEE 754 Float,Write,1 register,Write single 32-bit float coil value,Set system parameters,30003,✅ Implemented
+0x06,6,Write Single Register,16-bit Word,Write,1 register,Write single analog output register,Set parameters / Commands,1000,✅ Implemented
+0x0F,15,Write Multiple Coils,IEEE 754 Float,Write,123 registers,Write multiple 32-bit float coil values,Bulk system configuration,30000-30246,❌ Not implemented
+0x10,16,Write Multiple Registers,16-bit Words,Write,123 registers,Write multiple analog output registers,Bulk parameter setting,1000-1246,✅ Implemented
+,,,,,,,,
+EXCEPTION CODES,,,,,,,,
+0x01,,Illegal Function,,,,"Function code not supported",,
+0x02,,Illegal Data Address,,,,"Register address out of range",,
+0x03,,Illegal Data Value,,,,"Invalid data value",,
+0x04,,Slave Device Failure,,,,"Unrecoverable error occurred",,
+0x05,,Acknowledge,,,,"Long duration command accepted",,
+0x06,,Slave Device Busy,,,,"Command rejected, try again",,
+,,,,,,,,
+BMS SPECIFIC DATA TYPES,,,,,,,,
+IEEE 754 Float,,32-bit Float,Float,R/W,2 registers,"Stored in 2 consecutive registers",All measurements,1000-1001,✅ Implemented
+Cell Voltage,,Individual Cell,Float,Read,2 registers,"3.0V - 4.5V range",Cell monitoring,1010-6001,✅ Implemented
+Temperature,,Sensor Reading,Float,Read,2 registers,"-40°C to +120°C range",Thermal monitoring,7000-9303,✅ Implemented
+Balancing Status,,Cell Balancing,Boolean,R/W,1 bit,"0=Inactive, 1=Active",Cell balancing,40000-44991,✅ Implemented
+,,,,,,,,
+ADDRESS CALCULATION FORMULAS,,,,,,,,
+Cell Voltage Address,,String/Packet/Cell,Formula,,,,"1010 + (String-1)*832 + (Packet-1)*208 + (Cell-1)*2",Dynamic calculation,✅ Implemented
+Temperature Address,,String/Packet/BMS/Sensor,Formula,,,,"7000 + (String-1)*384 + (Packet-1)*96 + (BMS-1)*16 + (Sensor-1)*2",Dynamic calculation,✅ Implemented
+Balancing Address,,String/Packet/Cell,Formula,,,,"40000 + (String-1)*416 + (Packet-1)*104 + (Cell-1)",Dynamic calculation,✅ Implemented

@@ -1,0 +1,29 @@
+Category,Register Address,Data Type,Size (bytes),Size (registers),Description,Unit,Access,Range,Example Value,Notes
+SYSTEM INFO,1000-1001,IEEE 754 Float,4,2,State of Charge (SOC),%,R/W,0-100,88.50,Battery charge percentage
+SYSTEM INFO,1002-1003,IEEE 754 Float,4,2,State of Health (SOH),%,R/W,0-100,98.75,Battery health percentage
+SYSTEM INFO,1004-1005,IEEE 754 Float,4,2,Total Pack Voltage,V,R/W,0-500,403.2,Sum of all cell voltages
+SYSTEM INFO,1006-1007,IEEE 754 Float,4,2,Maximum Temperature,°C,R/W,-40-120,25.5,Highest temperature in pack
+SYSTEM INFO,1008-1009,IEEE 754 Float,4,2,Pack Current,A,R/W,-1000-1000,-75.0,Positive=Charge / Negative=Discharge
+,,,,,,,,,,
+CELL VOLTAGES,1010-1011,IEEE 754 Float,4,2,String-1 Packet-1 Cell-1 Voltage,V,R,2.5-4.5,3.730,Individual cell voltage
+CELL VOLTAGES,1012-1013,IEEE 754 Float,4,2,String-1 Packet-1 Cell-2 Voltage,V,R,2.5-4.5,3.732,Individual cell voltage
+CELL VOLTAGES,1014-1015,IEEE 754 Float,4,2,String-1 Packet-1 Cell-3 Voltage,V,R,2.5-4.5,3.728,Individual cell voltage
+CELL VOLTAGES,...,...,...,...,...,...,...,...,...,...,Total 4992 cells (12×4×104)
+CELL VOLTAGES,5998-5999,IEEE 754 Float,4,2,String-12 Packet-4 Cell-103 Voltage,V,R,2.5-4.5,3.735,Individual cell voltage
+CELL VOLTAGES,6000-6001,IEEE 754 Float,4,2,String-12 Packet-4 Cell-104 Voltage,V,R,2.5-4.5,3.731,Individual cell voltage
+,,,,,,,,,,
+TEMPERATURES,7000-7001,IEEE 754 Float,4,2,String-1 Packet-1 BMS-1 Sensor-1,°C,R,-40-120,24.5,Temperature sensor reading
+TEMPERATURES,7002-7003,IEEE 754 Float,4,2,String-1 Packet-1 BMS-1 Sensor-2,°C,R,-40-120,25.0,Temperature sensor reading
+TEMPERATURES,7004-7005,IEEE 754 Float,4,2,String-1 Packet-1 BMS-1 Sensor-3,°C,R,-40-120,24.8,Temperature sensor reading
+TEMPERATURES,...,...,...,...,...,...,...,...,...,...,Total 2304 sensors (12×4×6×8)
+TEMPERATURES,9300-9301,IEEE 754 Float,4,2,String-12 Packet-4 BMS-6 Sensor-7,°C,R,-40-120,26.2,Temperature sensor reading
+TEMPERATURES,9302-9303,IEEE 754 Float,4,2,String-12 Packet-4 BMS-6 Sensor-8,°C,R,-40-120,25.8,Temperature sensor reading
+,,,,,,,,,,
+COILS,30003-30004,IEEE 754 Float,4,2,Average Temperature,°C,R/W,-40-120,25.8,System average temperature
+COILS,30005-30006,IEEE 754 Float,4,2,Average Cell Voltage,V,R/W,2.5-4.5,3.65,System average cell voltage
+COILS,30007-30008,IEEE 754 Float,4,2,Pack Voltage,V,R/W,0-500,403.2,Total pack voltage reading
+,,,,,,,,,,
+BALANCING,40000,Boolean,1,1,String-1 Packet-1 Cell-1 Balancing,-,R/W,0-1,0,Cell balancing active status
+BALANCING,40001,Boolean,1,1,String-1 Packet-1 Cell-2 Balancing,-,R/W,0-1,1,Cell balancing active status
+BALANCING,...,...,...,...,...,...,...,...,...,...,Total 4992 balancing status
+BALANCING,44991,Boolean,1,1,String-12 Packet-4 Cell-104 Balancing,-,R/W,0-1,0,Cell balancing active status

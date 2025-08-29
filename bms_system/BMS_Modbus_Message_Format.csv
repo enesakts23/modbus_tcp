@@ -1,0 +1,40 @@
+Message Type,Byte Position,Field Name,Size (bytes),Data Type,Description,Example Value (Hex),Example Value (Dec),Notes
+TCP HEADER,0-1,Transaction ID,2,uint16,Request/Response matching identifier,0x0001,1,Increments with each request
+TCP HEADER,2-3,Protocol ID,2,uint16,Protocol identifier (always 0 for Modbus),0x0000,0,Fixed value for Modbus TCP
+TCP HEADER,4-5,Length,2,uint16,Number of remaining bytes,0x0006,6,Unit ID + Function Code + Data
+TCP HEADER,6,Unit ID,1,uint8,Slave address identifier,0x01,1,Identifies target slave device
+,,,,,,,,
+FUNCTION CODES,7,Function Code,1,uint8,Modbus function being performed,0x03,3,See function code table below
+,,,,,,,,
+READ HOLDING REGISTERS,8-9,Starting Address,2,uint16,First register to read,0x03E8,1000,Register address
+READ HOLDING REGISTERS,10-11,Quantity,2,uint16,Number of registers to read,0x0002,2,For 32-bit float (2 registers)
+,,,,,,,,
+WRITE SINGLE REGISTER,8-9,Register Address,2,uint16,Target register address,0x03E8,1000,Register to write
+WRITE SINGLE REGISTER,10-11,Register Value,2,uint16,Value to write,0x42B1,17073,High part of 32-bit float
+,,,,,,,,
+READ COILS,8-9,Starting Address,2,uint16,First coil register to read,0x7533,30003,Coil register address
+READ COILS,10-11,Quantity,2,uint16,Number of coil registers to read,0x0006,6,For 3 coil pairs (6 registers)
+,,,,,,,,
+WRITE SINGLE COIL,8-9,Coil Address,2,uint16,Target coil register address,0x7533,30003,Coil register to write
+WRITE SINGLE COIL,10-11,Coil Value,2,uint16,Register value,0x42CE,17102,High part of 32-bit float
+,,,,,,,,
+RESPONSE HEADER,0-1,Transaction ID,2,uint16,Same as request,0x0001,1,Matches request transaction ID
+RESPONSE HEADER,2-3,Protocol ID,2,uint16,Always 0,0x0000,0,Fixed value
+RESPONSE HEADER,4-5,Length,2,uint16,Response data length,0x0007,7,Unit ID + Function + Data length
+RESPONSE HEADER,6,Unit ID,1,uint8,Same as request,0x01,1,Echoes request unit ID
+RESPONSE HEADER,7,Function Code,1,uint8,Same as request,0x03,3,Echoes request function
+,,,,,,,,
+HOLDING REGISTER RESPONSE,8,Byte Count,1,uint8,Number of data bytes following,0x04,4,2 registers × 2 bytes each
+HOLDING REGISTER RESPONSE,9-10,Register 1000 (High),2,uint16,SOC high part,0x42B1,17073,IEEE 754 high 16 bits
+HOLDING REGISTER RESPONSE,11-12,Register 1001 (Low),2,uint16,SOC low part,0x0000,0,IEEE 754 low 16 bits
+,,,,,,,,
+COIL RESPONSE,8,Byte Count,1,uint8,Number of data bytes following,0x0C,12,6 registers × 2 bytes each
+COIL RESPONSE,9-10,AVG_TEMP (High),2,uint16,Average temperature high part,0x41CE,17102,IEEE 754 high 16 bits
+COIL RESPONSE,11-12,AVG_TEMP (Low),2,uint16,Average temperature low part,0x6666,26214,IEEE 754 low 16 bits
+COIL RESPONSE,13-14,AVG_CELLV (High),2,uint16,Average cell voltage high part,0x4069,16489,IEEE 754 high 16 bits
+COIL RESPONSE,15-16,AVG_CELLV (Low),2,uint16,Average cell voltage low part,0x999A,39322,IEEE 754 low 16 bits
+COIL RESPONSE,17-18,PACK_VOLT (High),2,uint16,Pack voltage high part,0x43C9,17353,IEEE 754 high 16 bits
+COIL RESPONSE,19-20,PACK_VOLT (Low),2,uint16,Pack voltage low part,0x999A,39322,IEEE 754 low 16 bits
+,,,,,,,,
+ERROR RESPONSE,7,Function Code,1,uint8,Original function + 0x80,0x83,131,0x03 + 0x80 = Error response
+ERROR RESPONSE,8,Exception Code,1,uint8,Error type,0x02,2,Illegal data address
