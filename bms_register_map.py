@@ -17,8 +17,15 @@ class BMSRegisters(IntEnum):
     CURRENT = 1008                    # Current (1008-1009)
     CURRENT_HIGH = 1008
     CURRENT_LOW = 1009
-    
-    CELL_VOLTAGE_BASE = 1010          # Her hücre 2 register (32-bit float)
+
+    AVERAGE_VOLTAGE = 1012            # Average Voltage (1012-1013)
+    AVERAGE_VOLTAGE_HIGH = 1012
+    AVERAGE_VOLTAGE_LOW = 1013
+    AVERAGE_TEMPERATURE = 1014        # Average Temperature (1014-1015)
+    AVERAGE_TEMPERATURE_HIGH = 1014
+    AVERAGE_TEMPERATURE_LOW = 1015
+
+    CELL_VOLTAGE_BASE = 1016          # Her hücre 2 register (32-bit float)
     TEMP_SENSOR_BASE = 7000           # Her sensör 2 register (32-bit float)
 
 class BMSAddressCalculator:
@@ -147,8 +154,6 @@ class BMSDataConverter:
     @staticmethod
     def temp_to_raw(temp_c: float) -> int:
         return int(temp_c + 40)
-    
-    @staticmethod
     def raw_to_temp(raw: int) -> float:
         return raw - 40
     
@@ -161,38 +166,28 @@ class BMSDataConverter:
         return raw / 1000.0
 
 BMS_INITIAL_VALUES = {
-    # SOC: 88.50 (32-bit float registers 1000-1001)
-    BMSRegisters.SOC_HIGH: 0x42B1,    # High register
-    BMSRegisters.SOC_LOW: 0x0000,     # Low register
-    
-    # SOH: 98.75 (32-bit float registers 1002-1003)  
-    BMSRegisters.SOH_HIGH: 0x42C5,    # High register
-    BMSRegisters.SOH_LOW: 0x8000,     # Low register
-    
-    # Total Voltage: 403.2V (32-bit float registers 1004-1005)
-    BMSRegisters.TOTAL_VOLTAGE_HIGH: 0x43C9,  # High register
-    BMSRegisters.TOTAL_VOLTAGE_LOW: 0x999A,   # Low register
-    
-    # Max Temperature: 25.5°C (32-bit float registers 1006-1007)
-    BMSRegisters.MAX_TEMPERATURE_HIGH: 0x41CC,  # High register
-    BMSRegisters.MAX_TEMPERATURE_LOW: 0x0000,   # Low register
-    
-    # Current: -75.0A (32-bit float registers 1008-1009)
-    BMSRegisters.CURRENT_HIGH: 0xC296,  # High register (negative)
-    BMSRegisters.CURRENT_LOW: 0x0000,   # Low register
+
+    BMSRegisters.SOC_HIGH: 0x42B1, 
+    BMSRegisters.SOC_LOW: 0x0000,   
+    BMSRegisters.SOH_HIGH: 0x42C5,  
+    BMSRegisters.SOH_LOW: 0x8000,  
+    BMSRegisters.TOTAL_VOLTAGE_HIGH: 0x43C9,  
+    BMSRegisters.TOTAL_VOLTAGE_LOW: 0x999A,  
+    BMSRegisters.MAX_TEMPERATURE_HIGH: 0x41CC,  
+    BMSRegisters.MAX_TEMPERATURE_LOW: 0x0000,  
+    BMSRegisters.CURRENT_HIGH: 0xC296,  
+    BMSRegisters.CURRENT_LOW: 0x0000,  
 }
 
 BMS_INPUT_VALUES = {}
 BMS_COIL_VALUES = {
-    # Average Temperature: 25.8°C (32-bit float registers 30003-30004)
-    BMSCoils.AVG_TEMP_HIGH: 0x41CE,    # High register
-    BMSCoils.AVG_TEMP_LOW: 0x6666,     # Low register
+
+    BMSCoils.AVG_TEMP_HIGH: 0x41CE,    
+    BMSCoils.AVG_TEMP_LOW: 0x6666,     
     
-    # Average Cell Voltage: 3.65V (32-bit float registers 30005-30006)
-    BMSCoils.AVG_CELLV_HIGH: 0x4069,   # High register  
-    BMSCoils.AVG_CELLV_LOW: 0x999A,    # Low register
+    BMSCoils.AVG_CELLV_HIGH: 0x4069,   
+    BMSCoils.AVG_CELLV_LOW: 0x999A,    
     
-    # Pack Voltage: 403.2V (32-bit float registers 30007-30008)
-    BMSCoils.PACK_VOLT_HIGH: 0x43C9,   # High register
-    BMSCoils.PACK_VOLT_LOW: 0x999A,    # Low register
+    BMSCoils.PACK_VOLT_HIGH: 0x43C9,  
+    BMSCoils.PACK_VOLT_LOW: 0x999A,  
 }
