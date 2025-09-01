@@ -282,7 +282,7 @@ class CANMessageSimulator:
                             self.temperatures[temp_key] = new_temp
 
     def save_data_to_file(self):
-        """BMS verilerini JSON dosyasına kaydet"""
+        """BMS verilerini JSON dosyasına kaydet - TAM İSKELET YAPISI"""
         try:
             # Ana BMS verileri (String-1, Packet-1 referans alınır)
             ref_string = 1
@@ -308,25 +308,49 @@ class CANMessageSimulator:
                     "min_cell_voltage": min([volt for volt in self.cell_voltages.values() if volt], default=3.6),
                     "avg_cell_voltage": sum(self.cell_voltages.values()) / len(self.cell_voltages) if self.cell_voltages else 3.65
                 },
-                "cell_voltages": {
-                    f"string_{s}_packet_{p}_cell_{c}": voltage 
-                    for (s, p, c), voltage in list(self.cell_voltages.items())[:100]  # İlk 100 hücre
-                },
-                "temperatures": {
-                    f"string_{s}_packet_{p}_temp_{t}": temp 
-                    for (s, p, t), temp in list(self.temperatures.items())[:50]  # İlk 50 sensör
-                },
-                "string_data": {
-                    f"string_{s}_packet_{p}": {
-                        "soc": self.soc_values.get((s, p), 85.0),
-                        "soh": self.soh_values.get((s, p), 98.0),
-                        "current": self.currents.get((s, p), -50.0),
-                        "pack_voltage": self.pack_voltages.get((s, p), 400.0)
-                    }
-                    for s in range(1, min(4, self.TOTAL_STRINGS + 1))  # İlk 3 string
-                    for p in range(1, self.PACKETS_PER_STRING + 1)
-                }
+                "cell_voltages": {},
+                "temperatures": {},
+                "string_data": {}
             }
+            
+            # ✅ TAM İSKELET: BÜTÜN HÜCRELERİ OLUŞTUR (12 String × 4 Paket × 104 Hücre = 4,992 hücre)
+            for string_id in range(1, self.TOTAL_STRINGS + 1):  # 1-12 string
+                for packet_id in range(1, self.PACKETS_PER_STRING + 1):  # 1-4 paket
+                    for cell_id in range(1, 105):  # 1-104 hücre (tam iskelet!)
+                        cell_key = f"string_{string_id}_packet_{packet_id}_cell_{cell_id}"
+                        
+                        # Simülasyon verisini kontrol et ve değer ata
+                        sim_key = (string_id, packet_id, cell_id)
+                        if sim_key in self.cell_voltages:
+                            bms_data["cell_voltages"][cell_key] = self.cell_voltages[sim_key]
+                        else:
+                            bms_data["cell_voltages"][cell_key] = 0.0  # Veri yoksa 0.0 ata
+            
+            # ✅ TAM İSKELET: BÜTÜN SICAKLIK SENSÖRLERİNİ OLUŞTUR (12 String × 4 Paket × 8 Sensör = 384 sensör)  
+            for string_id in range(1, self.TOTAL_STRINGS + 1):  # 1-12 string
+                for packet_id in range(1, self.PACKETS_PER_STRING + 1):  # 1-4 paket
+                    for temp_id in range(1, 9):  # 1-8 sıcaklık sensörü (tam iskelet!)
+                        temp_key = f"string_{string_id}_packet_{packet_id}_temp_{temp_id}"
+                        
+                        # Simülasyon verisini kontrol et ve değer ata
+                        sim_key = (string_id, packet_id, temp_id)
+                        if sim_key in self.temperatures:
+                            bms_data["temperatures"][temp_key] = self.temperatures[sim_key]
+                        else:
+                            bms_data["temperatures"][temp_key] = 0.0  # Veri yoksa 0.0 ata
+            
+            # ✅ TAM İSKELET: BÜTÜN STRING VERİLERİNİ OLUŞTUR (12 String × 4 Paket = 48 adet)
+            for string_id in range(1, self.TOTAL_STRINGS + 1):  # 1-12 string
+                for packet_id in range(1, self.PACKETS_PER_STRING + 1):  # 1-4 paket
+                    string_key = f"string_{string_id}_packet_{packet_id}"
+                    
+                    # Bu string-packet için veriler varsa kullan, yoksa varsayılan değerler
+                    bms_data["string_data"][string_key] = {
+                        "soc": self.soc_values.get((string_id, packet_id), 85.0 + random.uniform(-5, 5)),
+                        "soh": self.soh_values.get((string_id, packet_id), 98.0 + random.uniform(-2, 2)),
+                        "current": self.currents.get((string_id, packet_id), -50.0 + random.uniform(-10, 10)),
+                        "pack_voltage": self.pack_voltages.get((string_id, packet_id), 400.0 + random.uniform(-5, 5))
+                    }
             
             # JSON dosyasına yaz
             with open(self.data_file, 'w', encoding='utf-8') as f:
