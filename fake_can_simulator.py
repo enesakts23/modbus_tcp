@@ -20,11 +20,14 @@ import threading
 import sys
 from datetime import datetime
 import socket
+import json
+import os
 
 class CANMessageSimulator:
     def __init__(self):
         self.running = False
         self.update_interval = 2.0  # 2 saniyede bir güncelle
+        self.data_file = "bms_data.json"  # Veri dosyası
         
         # BMS Sistem Yapısı
         self.TOTAL_STRINGS = 12
@@ -278,6 +281,63 @@ class CANMessageSimulator:
                             new_temp = max(0.0, min(80.0, new_temp))
                             self.temperatures[temp_key] = new_temp
 
+    def save_data_to_file(self):
+        """BMS verilerini JSON dosyasına kaydet"""
+        try:
+            # Ana BMS verileri (String-1, Packet-1 referans alınır)
+            ref_string = 1
+            ref_packet = 1
+            
+            bms_data = {
+                "timestamp": datetime.now().isoformat(),
+                "system_info": {
+                    "total_strings": self.TOTAL_STRINGS,
+                    "packets_per_string": self.PACKETS_PER_STRING,
+                    "total_cells": self.calculate_total_cells(),
+                    "total_temps": self.calculate_total_temps()
+                },
+                "main_data": {
+                    "soc": self.soc_values.get((ref_string, ref_packet), 85.0),
+                    "soh": self.soh_values.get((ref_string, ref_packet), 98.0),
+                    "current": self.currents.get((ref_string, ref_packet), -50.0),
+                    "pack_voltage": self.pack_voltages.get((ref_string, ref_packet), 400.0),
+                    "max_temperature": max([temp for temp in self.temperatures.values() if temp], default=25.0),
+                    "min_temperature": min([temp for temp in self.temperatures.values() if temp], default=20.0),
+                    "avg_temperature": sum(self.temperatures.values()) / len(self.temperatures) if self.temperatures else 25.0,
+                    "max_cell_voltage": max([volt for volt in self.cell_voltages.values() if volt], default=3.7),
+                    "min_cell_voltage": min([volt for volt in self.cell_voltages.values() if volt], default=3.6),
+                    "avg_cell_voltage": sum(self.cell_voltages.values()) / len(self.cell_voltages) if self.cell_voltages else 3.65
+                },
+                "cell_voltages": {
+                    f"string_{s}_packet_{p}_cell_{c}": voltage 
+                    for (s, p, c), voltage in list(self.cell_voltages.items())[:100]  # İlk 100 hücre
+                },
+                "temperatures": {
+                    f"string_{s}_packet_{p}_temp_{t}": temp 
+                    for (s, p, t), temp in list(self.temperatures.items())[:50]  # İlk 50 sensör
+                },
+                "string_data": {
+                    f"string_{s}_packet_{p}": {
+                        "soc": self.soc_values.get((s, p), 85.0),
+                        "soh": self.soh_values.get((s, p), 98.0),
+                        "current": self.currents.get((s, p), -50.0),
+                        "pack_voltage": self.pack_voltages.get((s, p), 400.0)
+                    }
+                    for s in range(1, min(4, self.TOTAL_STRINGS + 1))  # İlk 3 string
+                    for p in range(1, self.PACKETS_PER_STRING + 1)
+                }
+            }
+            
+            # JSON dosyasına yaz
+            with open(self.data_file, 'w', encoding='utf-8') as f:
+                json.dump(bms_data, f, indent=2, ensure_ascii=False)
+                
+            return True
+            
+        except Exception as e:
+            print(f"❌ Veri kaydetme hatası: {e}")
+            return False
+
     def print_sample_data(self):
         """Örnek veriyi konsola yazdır"""
         print(f"\n📊 ÖRNEK SİMÜLASYON VERİLERİ ({datetime.now().strftime('%H:%M:%S')})")
@@ -337,9 +397,9 @@ class CANMessageSimulator:
                             # 64-byte mesaj oluştur
                             message_data = self.create_can_message(string_id, packet_id, bms_id)
                             
-                            # Mesajı konsola yazdır (CAN dump formatında)
-                            hex_data = ' '.join([f'{b:02X}' for b in message_data])
-                            print(f"  can0  {can_id:03X}   [64]  {hex_data}")
+                            # Mesajı sessizce gönder (CAN dump formatında yazdırmıyoruz)
+                            # hex_data = ' '.join([f'{b:02X}' for b in message_data])
+                            # print(f"  can0  {can_id:03X}   [64]  {hex_data}")
                             
                             message_count += 1
                 
@@ -350,6 +410,10 @@ class CANMessageSimulator:
                 
                 # Simülasyon verilerini güncelle
                 self.update_simulation_data()
+                
+                # Verileri dosyaya kaydet
+                if self.save_data_to_file():
+                    print(f"💾 BMS verileri {self.data_file} dosyasına kaydedildi")
                 
                 # Bekleme
                 time.sleep(self.update_interval)

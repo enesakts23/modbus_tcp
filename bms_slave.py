@@ -2,6 +2,9 @@ import socket
 import struct
 import time
 import random
+import json
+import os
+import traceback
 from dataclasses import dataclass
 from typing import List
 from bms_register_map import (
@@ -24,6 +27,8 @@ class MegaBMSSlave:
         self.socket = None
         self.mapping = None
         self.last_update = time.time()
+        self.data_file = "bms_data.json"  # CAN simulator'dan gelen veri dosyası
+        self.use_fake_data = False  # Başlangıçta gerçek veriler kullanılır
         
     def mapping_new(self, nb_bits: int, nb_input_bits: int, 
                    nb_registers: int, nb_input_registers: int) -> ModbusMapping:
@@ -91,79 +96,240 @@ class MegaBMSSlave:
                 
         print("✅ Mega BMS başlatma tamamlandı (32-bit float format)!")
     
+    def load_can_data(self):
+        """CAN simulator'dan gelen verileri oku"""
+        try:
+            if not os.path.exists(self.data_file):
+                print(f"⚠️ {self.data_file} bulunamadı, sahte veri kullanılıyor")
+                self.use_fake_data = True
+                return None
+                
+            with open(self.data_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            # Dosya yaşını kontrol et (5 saniyeden eski ise sahte veri kullan)
+            file_time = os.path.getmtime(self.data_file)
+            current_time = time.time()
+            
+            if current_time - file_time > 5.0:
+                print(f"⚠️ {self.data_file} eski (5s+), sahte veri kullanılıyor")
+                self.use_fake_data = True
+                return None
+                
+            self.use_fake_data = False
+            return data
+            
+        except Exception as e:
+            print(f"❌ CAN veri okuma hatası: {e}, sahte veri kullanılıyor")
+            self.use_fake_data = True
+            return None
+    
+    def update_from_can_data(self):
+        """CAN verilerinden BMS register'larını güncelle"""
+        can_data = self.load_can_data()
+        
+        if can_data is None or self.use_fake_data:
+            return  # Sahte veri kullanılacak
+            
+        try:
+            main_data = can_data.get('main_data', {})
+            
+            # Ana BMS verilerini güncelle (32-bit float format)
+            if 'soc' in main_data:
+                soc = float(main_data['soc'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(soc)
+                self.mapping.tab_registers[BMSRegisters.SOC_HIGH] = high_reg
+                self.mapping.tab_registers[BMSRegisters.SOC_LOW] = low_reg
+                
+            if 'soh' in main_data:
+                soh = float(main_data['soh'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(soh)
+                self.mapping.tab_registers[BMSRegisters.SOH_HIGH] = high_reg
+                self.mapping.tab_registers[BMSRegisters.SOH_LOW] = low_reg
+                
+            if 'pack_voltage' in main_data:
+                voltage = float(main_data['pack_voltage'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(voltage)
+                self.mapping.tab_registers[BMSRegisters.TOTAL_VOLTAGE_HIGH] = high_reg
+                self.mapping.tab_registers[BMSRegisters.TOTAL_VOLTAGE_LOW] = low_reg
+                
+            if 'current' in main_data:
+                current = float(main_data['current'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(current)
+                self.mapping.tab_registers[BMSRegisters.CURRENT_HIGH] = high_reg
+                self.mapping.tab_registers[BMSRegisters.CURRENT_LOW] = low_reg
+                
+            if 'max_temperature' in main_data:
+                temp = float(main_data['max_temperature'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(temp)
+                self.mapping.tab_registers[BMSRegisters.MAX_TEMPERATURE_HIGH] = high_reg
+                self.mapping.tab_registers[BMSRegisters.MAX_TEMPERATURE_LOW] = low_reg
+            
+            # Coil register'ları güncelle
+            if 'avg_temperature' in main_data:
+                avg_temp = float(main_data['avg_temperature'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(avg_temp)
+                self.mapping.tab_registers[BMSCoils.AVG_TEMP_HIGH] = high_reg
+                self.mapping.tab_registers[BMSCoils.AVG_TEMP_LOW] = low_reg
+                
+            if 'avg_cell_voltage' in main_data:
+                avg_cellv = float(main_data['avg_cell_voltage'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(avg_cellv)
+                self.mapping.tab_registers[BMSCoils.AVG_CELLV_HIGH] = high_reg
+                self.mapping.tab_registers[BMSCoils.AVG_CELLV_LOW] = low_reg
+                
+            if 'pack_voltage' in main_data:
+                pack_volt = float(main_data['pack_voltage'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(pack_volt)
+                self.mapping.tab_registers[BMSCoils.PACK_VOLT_HIGH] = high_reg
+                self.mapping.tab_registers[BMSCoils.PACK_VOLT_LOW] = low_reg
+            
+            # Hücre voltajlarını güncelle (varsa)
+            cell_voltages = can_data.get('cell_voltages', {})
+            for cell_name, voltage in cell_voltages.items():
+                try:
+                    # "string_1_packet_1_cell_1" formatından parse et
+                    parts = cell_name.split('_')
+                    if len(parts) >= 6:
+                        string_no = int(parts[1])
+                        packet_no = int(parts[3])
+                        cell_no = int(parts[5])
+                        
+                        address = BMSAddressCalculator.get_cell_voltage_address(string_no, packet_no, cell_no)
+                        if address + 1 < len(self.mapping.tab_registers):
+                            high_reg, low_reg = BMSDataConverter.float_to_registers(float(voltage))
+                            self.mapping.tab_registers[address] = high_reg
+                            self.mapping.tab_registers[address + 1] = low_reg
+                except:
+                    continue
+            
+            # Sıcaklık sensörlerini güncelle (varsa)
+            temperatures = can_data.get('temperatures', {})
+            for temp_name, temperature in temperatures.items():
+                try:
+                    # "string_1_packet_1_temp_1" formatından parse et
+                    parts = temp_name.split('_')
+                    if len(parts) >= 6:
+                        string_no = int(parts[1])
+                        packet_no = int(parts[3])
+                        temp_no = int(parts[5])
+                        
+                        # Temp_no'yu BMS ve sensor'e çevir (basit hesaplama)
+                        bms_no = ((temp_no - 1) // 7) + 1
+                        sensor_no = ((temp_no - 1) % 7) + 1
+                        
+                        if bms_no <= 6 and sensor_no <= 8:
+                            address = BMSAddressCalculator.get_temperature_address(string_no, packet_no, bms_no, sensor_no)
+                            if address + 1 < len(self.mapping.tab_registers):
+                                high_reg, low_reg = BMSDataConverter.float_to_registers(float(temperature))
+                                self.mapping.tab_registers[address] = high_reg
+                                self.mapping.tab_registers[address + 1] = low_reg
+                except:
+                    continue
+                    
+            print(f"📡 CAN verilerinden güncellendi: SOC={main_data.get('soc', 0):.1f}%, "
+                  f"Current={main_data.get('current', 0):.1f}A, "
+                  f"Voltage={main_data.get('pack_voltage', 0):.1f}V")
+                  
+        except Exception as e:
+            print(f"❌ CAN veri işleme hatası: {e}")
+            self.use_fake_data = True
+    
     def simulate_mega_bms_data(self):
-        current_time = time.time()
-        
-        if current_time - self.last_update < 5.0:
-            return
-            
-        self.last_update = current_time
-        
-        # SOC güncelle (32-bit float format)
-        soc_high = self.mapping.tab_registers[BMSRegisters.SOC_HIGH]
-        soc_low = self.mapping.tab_registers[BMSRegisters.SOC_LOW]
-        current_soc = BMSDataConverter.registers_to_float(soc_high, soc_low)
-
-        if current_soc > 0:
-            new_soc = max(0.0, current_soc - 0.1)  # %0.1 azalt
-            high_reg, low_reg = BMSDataConverter.float_to_registers(new_soc)
-            self.mapping.tab_registers[BMSRegisters.SOC_HIGH] = high_reg
-            self.mapping.tab_registers[BMSRegisters.SOC_LOW] = low_reg
-        
-        # 100 rastgele hücre voltajını güncelle (32-bit float format)
-        update_count = 0
-        for _ in range(100):
-            string_no = random.randint(1, 12)
-            packet_no = random.randint(1, 4)
-            cell_no = random.randint(1, 104)
-            
+        """4992 hücreli ve 2304 sensörlü BMS verilerini simüle eder"""
+        try:
+            # Önce JSON dosyasından veri okumaya çalış
+            json_data_loaded = False
             try:
-                address = BMSAddressCalculator.get_cell_voltage_address(string_no, packet_no, cell_no)
-                if address + 1 < len(self.mapping.tab_registers):
-                    # Mevcut voltajı oku
-                    high_reg = self.mapping.tab_registers[address]
-                    low_reg = self.mapping.tab_registers[address + 1]
-                    current_voltage = BMSDataConverter.registers_to_float(high_reg, low_reg)
+                if os.path.exists("bms_data.json"):
+                    with open("bms_data.json", "r", encoding="utf-8") as f:
+                        json_data = json.load(f)
                     
-                    # Küçük değişiklik yap
-                    variation = random.uniform(-0.002, 0.002)  # ±2mV
-                    new_voltage = max(3.0, min(4.2, current_voltage + variation))
+                    # JSON verisindeki main_data'yı kullan
+                    main_data = json_data.get("main_data", {})
+                    if main_data:
+                        # SOC güncelle
+                        if "soc_percent" in main_data:
+                            soc_value = float(main_data["soc_percent"])
+                            high_reg, low_reg = BMSDataConverter.float_to_registers(soc_value)
+                            self.mapping.tab_registers[BMSRegisters.SOC_HIGH] = high_reg
+                            self.mapping.tab_registers[BMSRegisters.SOC_LOW] = low_reg
+                        
+                        # Total Voltage güncelle
+                        if "total_voltage" in main_data:
+                            voltage_value = float(main_data["total_voltage"])
+                            high_reg, low_reg = BMSDataConverter.float_to_registers(voltage_value)
+                            self.mapping.tab_registers[BMSCoils.PACK_VOLT_HIGH] = high_reg
+                            self.mapping.tab_registers[BMSCoils.PACK_VOLT_LOW] = low_reg
+                        
+                        # Current güncelle
+                        if "current" in main_data:
+                            current_value = float(main_data["current"])
+                            high_reg, low_reg = BMSDataConverter.float_to_registers(current_value)
+                            self.mapping.tab_registers[BMSRegisters.CURRENT_HIGH] = high_reg
+                            self.mapping.tab_registers[BMSRegisters.CURRENT_LOW] = low_reg
                     
-                    # Yeni değeri yaz
-                    new_high, new_low = BMSDataConverter.float_to_registers(new_voltage)
-                    self.mapping.tab_registers[address] = new_high
-                    self.mapping.tab_registers[address + 1] = new_low
-                    update_count += 1
-            except:
-                continue
-        
-        # 50 rastgele sıcaklık sensörünü güncelle (32-bit float format)
-        temp_update_count = 0
-        for _ in range(50):
-            string_no = random.randint(1, 12)
-            packet_no = random.randint(1, 4)
-            bms_no = random.randint(1, 6)
-            sensor_no = random.randint(1, 8)
+                    # JSON'dan hücre voltajlarını güncelle
+                    cell_update_count = 0
+                    if "cell_voltages" in json_data:
+                        for cell_key, voltage in json_data["cell_voltages"].items():
+                            try:
+                                cell_num = int(cell_key.replace("cell_", ""))
+                                if cell_num <= 100:  # İlk 100 hücre
+                                    # String 1, Packet 1 olarak varsayıyoruz
+                                    string_no = ((cell_num - 1) // 104) + 1
+                                    packet_no = (((cell_num - 1) % 104) // 26) + 1
+                                    cell_no = ((cell_num - 1) % 26) + 1
+                                    
+                                    address = BMSAddressCalculator.get_cell_voltage_address(string_no, packet_no, cell_no)
+                                    if address + 1 < len(self.mapping.tab_registers):
+                                        high_reg, low_reg = BMSDataConverter.float_to_registers(float(voltage))
+                                        self.mapping.tab_registers[address] = high_reg
+                                        self.mapping.tab_registers[address + 1] = low_reg
+                                        cell_update_count += 1
+                            except:
+                                continue
+                    
+                    # JSON'dan sıcaklıkları güncelle
+                    temp_update_count = 0
+                    if "temperatures" in json_data:
+                        for temp_key, temp in json_data["temperatures"].items():
+                            try:
+                                temp_num = int(temp_key.replace("temp_", ""))
+                                if temp_num <= 50:  # İlk 50 sensör
+                                    # String 1, Packet 1, BMS 1 olarak varsayıyoruz
+                                    string_no = ((temp_num - 1) // 8) + 1
+                                    packet_no = 1
+                                    bms_no = 1
+                                    sensor_no = ((temp_num - 1) % 8) + 1
+                                    
+                                    address = BMSAddressCalculator.get_temperature_address(string_no, packet_no, bms_no, sensor_no)
+                                    if address + 1 < len(self.mapping.tab_registers):
+                                        high_reg, low_reg = BMSDataConverter.float_to_registers(float(temp))
+                                        self.mapping.tab_registers[address] = high_reg
+                                        self.mapping.tab_registers[address + 1] = low_reg
+                                        temp_update_count += 1
+                            except:
+                                continue
+                    
+                    json_data_loaded = True
+                    soc = main_data.get("soc_percent", 0)
+                    voltage = main_data.get("total_voltage", 0)
+                    current = main_data.get("current", 0)
+                    print(f"📊 JSON verisi kullanıldı - SOC: {soc:.1f}%, Voltaj: {voltage:.1f}V, Akım: {current:.1f}A, {cell_update_count} hücre, {temp_update_count} sensör güncellendi")
+                        
+            except Exception as json_error:
+                print(f"⚠️ JSON okuma hatası: {json_error}")
             
-            try:
-                address = BMSAddressCalculator.get_temperature_address(string_no, packet_no, bms_no, sensor_no)
-                if address + 1 < len(self.mapping.tab_registers):
-                    # Mevcut sıcaklığı oku
-                    high_reg = self.mapping.tab_registers[address]
-                    low_reg = self.mapping.tab_registers[address + 1]
-                    current_temp = BMSDataConverter.registers_to_float(high_reg, low_reg)
-                    
-                    # Küçük değişiklik yap
-                    variation = random.uniform(-0.5, 0.5)  # ±0.5°C
-                    new_temp = max(0.0, min(120.0, current_temp + variation))
-                    
-                    # Yeni değeri yaz
-                    new_high, new_low = BMSDataConverter.float_to_registers(new_temp)
-                    self.mapping.tab_registers[address] = new_high
-                    self.mapping.tab_registers[address + 1] = new_low
-                    temp_update_count += 1
-            except:
-                continue
+            # JSON verisi yüklenemezse hata ver
+            if not json_data_loaded:
+                print(f"❌ CAN simulator'ı çalışmıyor! bms_data.json dosyası bulunamadı veya okunamadı.")
+                print(f"🔧 fake_can_simulator.py'yi başlatın!")
+                return
+            
+        except Exception as e:
+            print(f"❌ BMS veri simülasyonu hatası: {e}")
+            traceback.print_exc()
         
         # Akım güncelle (32-bit float format)
         current_high = self.mapping.tab_registers[BMSRegisters.CURRENT_HIGH]
@@ -199,8 +365,6 @@ class MegaBMSSlave:
         pack_volt_high, pack_volt_low = BMSDataConverter.float_to_registers(pack_voltage)
         self.mapping.tab_registers[BMSCoils.PACK_VOLT_HIGH] = pack_volt_high
         self.mapping.tab_registers[BMSCoils.PACK_VOLT_LOW] = pack_volt_low
-        
-        print(f"[MEGA BMS] {update_count} hücre güncellendi, {temp_update_count} sensör güncellendi, Current: {new_current:.1f}A, SOC: {new_soc:.1f}%")
         
     def tcp_listen(self, max_connections: int = 1) -> bool:
 
