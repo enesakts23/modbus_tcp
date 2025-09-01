@@ -82,6 +82,12 @@ class MegaBMSSlave:
         for coil_addr, value in BMS_COIL_VALUES.items():
             if coil_addr < len(self.mapping.tab_registers):
                 self.mapping.tab_registers[coil_addr] = value
+        
+        # Test amaçlı bazı coil'leri aktif et
+        print("🔧 Test coil'leri başlatılıyor...")
+        for i in range(10):
+            if i < len(self.mapping.tab_bits):
+                self.mapping.tab_bits[i] = (i % 2 == 0)  # Çift numaralı coil'ler aktif
                 
         print("✅ Mega BMS başlatma tamamlandı (32-bit float format)!")
     
@@ -237,10 +243,15 @@ class MegaBMSSlave:
                 
             transaction_id, protocol_id, length, unit_id = struct.unpack('>HHHB', query[:7])
             function_code = query[7]
+            
+            print(f"[MODBUS] Function Code: {function_code:02X}, Unit ID: {unit_id}, Address: {length}")
+            
+            # Her istek öncesi veriyi güncelle
             self.simulate_mega_bms_data()
             
             if function_code == 0x03: 
                 address, count = struct.unpack('>HH', query[8:12])
+                print(f"[DEBUG] Function 03: Reading {count} registers from address {address}")
                 response_data = bytearray()
                 
                 for i in range(count):
@@ -254,8 +265,25 @@ class MegaBMSSlave:
                 response = struct.pack('>HHHBB', 
                     transaction_id, protocol_id, len(response_data) + 3, unit_id, function_code) + bytes([len(response_data)]) + response_data
                     
-            if function_code == 0x02:  
+            elif function_code == 0x04:  # Read Input Registers
                 address, count = struct.unpack('>HH', query[8:12])
+                print(f"[DEBUG] Function 04: Reading {count} input registers from address {address}")
+                response_data = bytearray()
+                
+                for i in range(count):
+                    reg_addr = address + i
+                    if reg_addr < len(self.mapping.tab_input_registers):
+                        value = self.mapping.tab_input_registers[reg_addr]
+                    else:
+                        value = 0
+                    response_data.extend(struct.pack('>H', value))
+                    
+                response = struct.pack('>HHHBB', 
+                    transaction_id, protocol_id, len(response_data) + 3, unit_id, function_code) + bytes([len(response_data)]) + response_data
+                    
+            elif function_code == 0x02:  
+                address, count = struct.unpack('>HH', query[8:12])
+                print(f"[DEBUG] Function 02: Reading {count} discrete inputs from address {address}")
                 byte_count = (count + 7) // 8
                 response_data = bytearray(byte_count)
                 
@@ -268,35 +296,21 @@ class MegaBMSSlave:
                 response = struct.pack('>HHHBB', 
                     transaction_id, protocol_id, byte_count + 3, unit_id, function_code) + bytes([byte_count]) + response_data
                     
-            elif function_code == 0x01:  # Read Coils - Artık holding register gibi
+            elif function_code == 0x01:  # Read Coils - Standard bit tabanlı
                 address, count = struct.unpack('>HH', query[8:12])
-                response_data = bytearray()
+                print(f"[DEBUG] Function 01: Reading {count} coils from address {address}")
+                byte_count = (count + 7) // 8
+                response_data = bytearray(byte_count)
                 
-                # 30000+ adresleri holding register olarak işle (32-bit float)
-                if address >= 30000:
-                    for i in range(count):
-                        reg_addr = address + i
-                        if reg_addr < len(self.mapping.tab_registers):
-                            value = self.mapping.tab_registers[reg_addr]
-                        else:
-                            value = 0
-                        response_data.extend(struct.pack('>H', value))
-                    
-                    response = struct.pack('>HHHBB', 
-                        transaction_id, protocol_id, len(response_data) + 3, unit_id, function_code) + bytes([len(response_data)]) + response_data
-                else:
-                    # Eski bit tabanlı coil işlemi (geriye uyumluluk için)
-                    byte_count = (count + 7) // 8
-                    response_data = bytearray(byte_count)
-                    
-                    for i in range(count):
-                        coil_addr = address + i
-                        if 0 <= coil_addr < len(self.mapping.tab_bits):
-                            if self.mapping.tab_bits[coil_addr]:
-                                response_data[i // 8] |= (1 << (i % 8))
-                                
-                    response = struct.pack('>HHHBB', 
-                        transaction_id, protocol_id, byte_count + 3, unit_id, function_code) + bytes([byte_count]) + response_data
+                # Coil'leri bit olarak işle
+                for i in range(count):
+                    coil_addr = address + i
+                    if 0 <= coil_addr < len(self.mapping.tab_bits):
+                        if self.mapping.tab_bits[coil_addr]:
+                            response_data[i // 8] |= (1 << (i % 8))
+                            
+                response = struct.pack('>HHHBB', 
+                    transaction_id, protocol_id, byte_count + 3, unit_id, function_code) + bytes([byte_count]) + response_data
                     
             elif function_code == 0x06: 
                 address, value = struct.unpack('>HH', query[8:12])
@@ -305,24 +319,20 @@ class MegaBMSSlave:
                     print(f"[MEGA BMS] Register {address} güncellendi: {value}")
                 response = query  
                 
-            elif function_code == 0x05: # Write Single Coil - Artık register yazma gibi
+            elif function_code == 0x05: # Write Single Coil - Standard bit tabanlı
                 address, value = struct.unpack('>HH', query[8:12])
                 
-                # 30000+ adresleri holding register olarak işle
-                if address >= 30000:
-                    if address < len(self.mapping.tab_registers):
-                        self.mapping.tab_registers[address] = value
-                        print(f"[MEGA BMS] Coil Register {address} güncellendi: {value}")
-                else:
-                    # Eski bit tabanlı coil işlemi (geriye uyumluluk için)
-                    coil_addr = address
-                    if 0 <= coil_addr < len(self.mapping.tab_bits):
-                        self.mapping.tab_bits[coil_addr] = (value == 0xFF00)
-                        print(f"[MEGA BMS] Coil {address} güncellendi: {'ON' if value == 0xFF00 else 'OFF'}")
+                # Standard coil yazma işlemi
+                coil_addr = address
+                if 0 <= coil_addr < len(self.mapping.tab_bits):
+                    self.mapping.tab_bits[coil_addr] = (value == 0xFF00)
+                    print(f"[MEGA BMS] Coil {address} güncellendi: {'ON' if value == 0xFF00 else 'OFF'}")
                         
                 response = query  # Echo back request  
                 
             else:
+                print(f"[ERROR] Desteklenmeyen function code: {function_code:02X}")
+                # Exception response: 0x01 = Illegal Function
                 response = struct.pack('>HHHBB', 
                     transaction_id, protocol_id, 3, unit_id, function_code | 0x80) + bytes([0x01])
                 
