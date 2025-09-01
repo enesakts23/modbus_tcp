@@ -248,9 +248,10 @@ class MegaBMSSlave:
                     # JSON verisindeki main_data'yı kullan
                     main_data = json_data.get("main_data", {})
                     if main_data:
-                        # SOC güncelle
-                        if "soc_percent" in main_data:
-                            soc_value = float(main_data["soc_percent"])
+
+                        # SOC güncelle (yeni: 'soc' anahtarı ile)
+                        if "soc" in main_data:
+                            soc_value = float(main_data["soc"])
                             high_reg, low_reg = BMSDataConverter.float_to_registers(soc_value)
                             self.mapping.tab_registers[BMSRegisters.SOC_HIGH] = high_reg
                             self.mapping.tab_registers[BMSRegisters.SOC_LOW] = low_reg
