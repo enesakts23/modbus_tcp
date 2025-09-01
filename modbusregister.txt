@@ -1,0 +1,28 @@
+# Mega BMS Modbus Register Haritası
+
+## 1000-1015: Ana BMS Verileri (32-bit float, 2 register)
+1000-1001: SOC (State of Charge)
+1002-1003: SOH (State of Health)
+1004-1005: Total Voltage
+1006-1007: Max Temperature
+1008-1009: Current
+1012-1013: Average Cell Voltage
+1014-1015: Average Temperature
+
+## 1016+: Hücre Voltajları (Her hücre 2 register, 32-bit float)
+1016-...: Cell Voltages (String/Packet/Cell bazında, adres hesaplama fonksiyonu ile)
+
+## 7000+: Sıcaklık Sensörleri (Her sensör 2 register, 32-bit float)
+7000-...: Temperature Sensors (String/Packet/BMS/Sensor bazında, adres hesaplama fonksiyonu ile)
+
+## 30003-30008: Coil Register'lar (32-bit float, 2 register)
+30003-30004: Average Temperature (Coil)
+30005-30006: Average Cell Voltage (Coil)
+30007-30008: Pack Voltage (Coil)
+
+## Açıklamalar
+- Tüm ana veriler 32-bit float olup, 2 register (high/low) olarak saklanır.
+- Hücre ve sıcaklık sensör adresleri için BMSAddressCalculator fonksiyonları kullanılır.
+- Diğer özel register ve coil adresleri için kodda ek fonksiyonlar ve sabitler tanımlıdır.
+
+Not: Daha fazla detay ve özel alanlar için kodun ilgili kısımlarına bakınız.

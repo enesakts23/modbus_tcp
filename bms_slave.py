@@ -164,6 +164,20 @@ class MegaBMSSlave:
                 high_reg, low_reg = BMSDataConverter.float_to_registers(temp)
                 self.mapping.tab_registers[BMSRegisters.MAX_TEMPERATURE_HIGH] = high_reg
                 self.mapping.tab_registers[BMSRegisters.MAX_TEMPERATURE_LOW] = low_reg
+
+            # Ortalama hücre voltajı (1012-1013)
+            if 'avg_cell_voltage' in main_data:
+                avg_cellv = float(main_data['avg_cell_voltage'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(avg_cellv)
+                self.mapping.tab_registers[BMSRegisters.AVERAGE_VOLTAGE_HIGH] = high_reg
+                self.mapping.tab_registers[BMSRegisters.AVERAGE_VOLTAGE_LOW] = low_reg
+
+            # Ortalama sıcaklık (1014-1015)
+            if 'avg_temperature' in main_data:
+                avg_temp = float(main_data['avg_temperature'])
+                high_reg, low_reg = BMSDataConverter.float_to_registers(avg_temp)
+                self.mapping.tab_registers[BMSRegisters.AVERAGE_TEMPERATURE_HIGH] = high_reg
+                self.mapping.tab_registers[BMSRegisters.AVERAGE_TEMPERATURE_LOW] = low_reg
             
             # Coil register'ları güncelle
             if 'avg_temperature' in main_data:
@@ -255,20 +269,34 @@ class MegaBMSSlave:
                             high_reg, low_reg = BMSDataConverter.float_to_registers(soc_value)
                             self.mapping.tab_registers[BMSRegisters.SOC_HIGH] = high_reg
                             self.mapping.tab_registers[BMSRegisters.SOC_LOW] = low_reg
-                        
+
                         # Total Voltage güncelle
                         if "total_voltage" in main_data:
                             voltage_value = float(main_data["total_voltage"])
                             high_reg, low_reg = BMSDataConverter.float_to_registers(voltage_value)
                             self.mapping.tab_registers[BMSCoils.PACK_VOLT_HIGH] = high_reg
                             self.mapping.tab_registers[BMSCoils.PACK_VOLT_LOW] = low_reg
-                        
+
                         # Current güncelle
                         if "current" in main_data:
                             current_value = float(main_data["current"])
                             high_reg, low_reg = BMSDataConverter.float_to_registers(current_value)
                             self.mapping.tab_registers[BMSRegisters.CURRENT_HIGH] = high_reg
                             self.mapping.tab_registers[BMSRegisters.CURRENT_LOW] = low_reg
+
+                        # Ortalama hücre voltajı (1012-1013)
+                        if "avg_cell_voltage" in main_data:
+                            avg_cellv = float(main_data["avg_cell_voltage"])
+                            high_reg, low_reg = BMSDataConverter.float_to_registers(avg_cellv)
+                            self.mapping.tab_registers[BMSRegisters.AVERAGE_VOLTAGE_HIGH] = high_reg
+                            self.mapping.tab_registers[BMSRegisters.AVERAGE_VOLTAGE_LOW] = low_reg
+
+                        # Ortalama sıcaklık (1014-1015)
+                        if "avg_temperature" in main_data:
+                            avg_temp = float(main_data["avg_temperature"])
+                            high_reg, low_reg = BMSDataConverter.float_to_registers(avg_temp)
+                            self.mapping.tab_registers[BMSRegisters.AVERAGE_TEMPERATURE_HIGH] = high_reg
+                            self.mapping.tab_registers[BMSRegisters.AVERAGE_TEMPERATURE_LOW] = low_reg
                     
                     # JSON'dan hücre voltajlarını güncelle
                     cell_update_count = 0
